@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tag Platformer</title>
+  <link rel="stylesheet" href="/client/style.css">
+</head>
+<body>
+  <div id="lobby">
+    <h1>TAG!</h1>
+    <p class="subtitle">Online Multiplayer Tag Platformer</p>
+    <input type="text" id="name-input" placeholder="Your name" maxlength="12" autocomplete="off">
+    <div class="color-picker" id="color-picker"></div>
+    <button class="btn-create" id="btn-create">Create Room</button>
+    <div class="divider">- or -</div>
+    <input type="text" id="code-input" placeholder="Room code" maxlength="4" autocomplete="off" style="text-transform:uppercase; text-align:center; font-size:1.3em; letter-spacing:0.2em;">
+    <button class="btn-join" id="btn-join">Join Room</button>
+
+    <div id="room-info">
+      <p>Room Code</p>
+      <div class="room-code" id="room-code"></div>
+      <p style="color:#888; font-size:0.85em;">Share this code with friends</p>
+      <ul id="player-list"></ul>
+      <div class="host-controls" id="host-controls" style="display:none;">
+        <select id="mode-select">
+          <option value="classic">Classic Tag</option>
+          <option value="freeze">Freeze Tag</option>
+          <option value="infection">Infection Tag</option>
+        </select>
+        <select id="map-select">
+          <option value="playground">Playground</option>
+          <option value="rooftops">Rooftops</option>
+          <option value="sunset_park">Sunset Park</option>
+          <option value="factory">Factory</option>
+        </select>
+        <button class="btn-create" id="btn-start">Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="game"></canvas>
+
+  <div id="game-over">
+    <h2>Game Over!</h2>
+    <ul id="results-list"></ul>
+    <button class="btn-join" id="btn-back-lobby">Back to Lobby</button>
+  </div>
+
+  <script type="module" src="/client/main.js"></script>
+</body>
+</html>
