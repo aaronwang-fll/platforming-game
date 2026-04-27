@@ -155,6 +155,7 @@ export class Room {
       left: !!input.left,
       right: !!input.right,
       jump: !!input.jump,
+      dash: !!input.dash,
     };
   }
 

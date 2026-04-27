@@ -10,17 +10,25 @@ export class Player {
     this.onGround = false;
     this.facingRight = true;
     this.jumpHeld = false;
-    this.input = { left: false, right: false, jump: false };
+    this.input = { left: false, right: false, jump: false, dash: false };
 
     // Tag state
     this.isIt = false;
     this.frozen = false;
-    this.immuneUntil = 0; // tick number
-    this.itTime = 0; // cumulative ticks spent as "it"
-    this.alive = true; // for infection mode
+    this.immuneUntil = 0;
+    this.itTime = 0;
+    this.alive = true;
 
     // Unfreeze progress (freeze tag)
     this.unfreezeProgress = 0;
+
+    // Wall-jump cooldown
+    this.wallJumpCooldown = 0;
+
+    // Dash
+    this.dashCharge = 1; // start full
+    this.dashTicks = 0;  // ticks remaining in active dash
+    this.dashHeld = false;
   }
 
   spawn(sx, sy) {
@@ -30,6 +38,9 @@ export class Player {
     this.vy = 0;
     this.onGround = false;
     this.facingRight = true;
+    this.wallJumpCooldown = 0;
+    this.dashCharge = 1;
+    this.dashTicks = 0;
   }
 
   toSnapshot() {
@@ -44,6 +55,8 @@ export class Player {
       frozen: this.frozen,
       alive: this.alive,
       unfreezeProgress: this.frozen ? Math.round(this.unfreezeProgress * 100) / 100 : 0,
+      dashCharge: Math.round(this.dashCharge * 100) / 100,
+      dashing: this.dashTicks > 0,
     };
   }
 

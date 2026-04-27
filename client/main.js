@@ -7,6 +7,7 @@ import {
   GRAVITY, MOVE_SPEED, JUMP_FORCE, MAX_FALL_SPEED,
   PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_COLORS, IT_SPEED_BOOST,
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
+  WALL_JUMP_COOLDOWN, DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
 } from '/shared/constants.js';
 import { C, S } from '/shared/protocol.js';
 
@@ -49,7 +50,7 @@ let lobbyPlayers = [];
 let selectedColor = PLAYER_COLORS[0];
 let gameActive = false;
 let localPlayer = null;
-let lastInput = { left: false, right: false, jump: false };
+let lastInput = { left: false, right: false, jump: false, dash: false };
 const effects = [];
 
 // --- Color picker ---
@@ -152,8 +153,10 @@ btnPractice.addEventListener('click', () => {
     x: 400, y: 800,
     vx: 0, vy: 0,
     onGround: false, facingRight: true,
-    jumpHeld: false,
+    jumpHeld: false, dashHeld: false,
     isIt: false, frozen: false,
+    wallJumpCooldown: 0,
+    dashCharge: 1, dashTicks: 0,
   };
 
   lastTime = 0;
@@ -242,9 +245,10 @@ net.on(S.GAME_STARTED, (msg) => {
       x: myData.x, y: myData.y,
       vx: 0, vy: 0,
       onGround: false, facingRight: true,
-      jumpHeld: false,
-      isIt: myData.isIt,
-      frozen: myData.frozen,
+      jumpHeld: false, dashHeld: false,
+      isIt: myData.isIt, frozen: myData.frozen,
+      wallJumpCooldown: 0,
+      dashCharge: 1, dashTicks: 0,
     };
   }
 
@@ -282,6 +286,7 @@ net.on(S.SNAPSHOT, (msg) => {
       // else: close enough, trust client prediction
       localPlayer.isIt = serverMe.isIt;
       localPlayer.frozen = serverMe.frozen;
+      localPlayer.dashCharge = serverMe.dashCharge;
     }
   }
 });
@@ -351,7 +356,7 @@ function gameLoop(time) {
     accumulator -= TICK_MS;
     const inp = input.getState();
 
-    if (!practiceMode && (inp.left !== lastInput.left || inp.right !== lastInput.right || inp.jump !== lastInput.jump)) {
+    if (!practiceMode && (inp.left !== lastInput.left || inp.right !== lastInput.right || inp.jump !== lastInput.jump || inp.dash !== lastInput.dash)) {
       net.send({ type: C.INPUT, keys: inp });
       lastInput = { ...inp };
     }
@@ -383,28 +388,54 @@ function isTouchingWall(p, platforms, dir) {
 function predictLocal(p, inp, platforms) {
   const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
 
-  p.vx = 0;
-  if (inp.left) { p.vx = -speed; p.facingRight = false; }
-  if (inp.right) { p.vx = speed; p.facingRight = true; }
+  // Wall-jump cooldown
+  if (p.wallJumpCooldown > 0) p.wallJumpCooldown--;
 
+  // Dash charge
+  if (p.dashTicks <= 0) {
+    p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE);
+  }
+
+  // Trigger dash
+  if (inp.dash && !p.dashHeld && p.dashCharge >= 1 && p.dashTicks <= 0) {
+    p.dashTicks = DASH_DURATION;
+    p.dashCharge = 0;
+  }
+  p.dashHeld = inp.dash;
+
+  // Movement
+  if (p.dashTicks > 0) {
+    p.dashTicks--;
+    p.vx = p.facingRight ? DASH_SPEED : -DASH_SPEED;
+  } else {
+    p.vx = 0;
+    if (inp.left) { p.vx = -speed; p.facingRight = false; }
+    if (inp.right) { p.vx = speed; p.facingRight = true; }
+  }
+
+  // Wall detection
   const touchingWallLeft = isTouchingWall(p, platforms, -2);
   const touchingWallRight = isTouchingWall(p, platforms, 2);
-  const onWall = !p.onGround && p.vy >= 0 && (touchingWallLeft || touchingWallRight);
+  const canWallJump = !p.onGround && p.wallJumpCooldown <= 0 && (touchingWallLeft || touchingWallRight);
+  const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
 
+  // Jump
   if (inp.jump && !p.jumpHeld) {
     if (p.onGround) {
       p.vy = JUMP_FORCE;
       p.onGround = false;
-    } else if (onWall) {
+    } else if (canWallJump) {
       p.vy = WALL_JUMP_FORCE_Y;
       p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
       p.facingRight = touchingWallLeft;
+      p.wallJumpCooldown = WALL_JUMP_COOLDOWN;
     }
   }
   p.jumpHeld = inp.jump;
 
+  // Gravity + wall slide
   p.vy += GRAVITY;
-  if (onWall && p.vy > 0) p.vy = Math.min(p.vy, WALL_SLIDE_SPEED);
+  if (onWall && p.vy > 0 && p.dashTicks <= 0) p.vy = Math.min(p.vy, WALL_SLIDE_SPEED);
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
   // Move X
@@ -417,7 +448,7 @@ function predictLocal(p, inp, platforms) {
     }
   }
 
-  // Move Y with substeps (prevents clipping through thin platforms)
+  // Move Y (substep)
   const steps = Math.max(1, Math.ceil(Math.abs(p.vy) / 8));
   const stepVy = p.vy / steps;
   p.onGround = false;
@@ -428,6 +459,7 @@ function predictLocal(p, inp, platforms) {
         if (stepVy > 0) { p.y = plat.y - PLAYER_HEIGHT; p.onGround = true; }
         else { p.y = plat.y + plat.h; }
         p.vy = 0;
+        if (p.onGround) p.wallJumpCooldown = 0;
         return;
       }
     }
@@ -461,7 +493,8 @@ function render() {
     // Practice: just draw local player directly
     if (localPlayer) {
       renderer.drawPlayer(localPlayer.x, localPlayer.y, selectedColor,
-        lobbyPlayers[0]?.name || 'You', localPlayer.facingRight, false, false);
+        lobbyPlayers[0]?.name || 'You', localPlayer.facingRight, false, false,
+        localPlayer.dashCharge, localPlayer.dashTicks > 0);
     }
   } else {
     const interpPlayers = interp.getInterpolatedPlayers(myId);
@@ -473,10 +506,12 @@ function render() {
 
       if (sp.id === myId && localPlayer) {
         renderer.drawPlayer(localPlayer.x, localPlayer.y, color, name,
-          localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen);
+          localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen,
+          localPlayer.dashCharge, localPlayer.dashTicks > 0);
       } else {
         renderer.drawPlayer(sp.x, sp.y, color, name,
-          sp.facingRight, sp.isIt, sp.frozen);
+          sp.facingRight, sp.isIt, sp.frozen,
+          sp.dashCharge, sp.dashing);
       }
     }
 
@@ -484,7 +519,8 @@ function render() {
       const info = lobbyPlayers.find(p => p.id === myId);
       renderer.drawPlayer(localPlayer.x, localPlayer.y,
         info ? info.color : PLAYER_COLORS[0], info ? info.name : 'You',
-        localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen);
+        localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen,
+        localPlayer.dashCharge, localPlayer.dashTicks > 0);
     }
   }
 

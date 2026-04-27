@@ -162,7 +162,7 @@ export class Renderer {
   // PLAYER — smooth circle blob with glow, bounce feel
   // ========================
 
-  drawPlayer(x, y, color, name, facingRight, isIt, isFrozen) {
+  drawPlayer(x, y, color, name, facingRight, isIt, isFrozen, dashCharge, dashing) {
     const ctx = this.ctx;
     // Center of the circle
     const cx = Math.round(x) + HALF;
@@ -257,6 +257,35 @@ export class Renderer {
         ctx.closePath();
         ctx.fill();
       }
+    }
+
+    // Dash trail effect
+    if (dashing) {
+      ctx.globalAlpha = 0.25;
+      const trailDir = facingRight ? -1 : 1;
+      for (let t = 1; t <= 3; t++) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx + trailDir * t * 10, cy, radius - t * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // Dash charge bar (below player)
+    if (dashCharge !== undefined && dashCharge < 1) {
+      const barW = S;
+      const barH = 4;
+      const barX = cx - barW / 2;
+      const barY = cy + radius + 8;
+      // Background
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      pill(ctx, barX, barY, barW, barH, 2);
+      ctx.fill();
+      // Fill
+      ctx.fillStyle = dashCharge > 0.9 ? '#FFD700' : 'rgba(255,255,255,0.7)';
+      pill(ctx, barX, barY, barW * dashCharge, barH, 2);
+      ctx.fill();
     }
 
     // Name tag — clean pill background
