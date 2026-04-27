@@ -23,8 +23,9 @@ export class Renderer {
     this.canvas.style.height = h + 'px';
   }
 
-  clear() {
-    this.ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  clear(bg) {
+    this.ctx.fillStyle = bg || '#000';
+    this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   }
 
   applyCamera(camera) {
