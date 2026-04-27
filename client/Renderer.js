@@ -299,7 +299,7 @@ export class Renderer {
 
     // Mode label
     if (mode) {
-      const labels = { classic: 'CLASSIC', freeze: 'FREEZE', infection: 'INFECTION' };
+      const labels = { classic: 'CLASSIC', freeze: 'FREEZE', infection: 'INFECTION', practice: 'PRACTICE' };
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
       ctx.font = 'bold 11px sans-serif';
       ctx.textAlign = 'left';

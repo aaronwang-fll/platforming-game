@@ -32,6 +32,7 @@ const btnStart = document.getElementById('btn-start');
 const btnBackLobby = document.getElementById('btn-back-lobby');
 const btnQuit = document.getElementById('btn-quit');
 const btnEndGame = document.getElementById('btn-end-game');
+const btnPractice = document.getElementById('btn-practice');
 
 // --- State ---
 const renderer = new Renderer(canvas);
@@ -94,13 +95,71 @@ btnBackLobby.addEventListener('click', () => {
 // Quit game (leave room, go back to main menu)
 btnQuit.addEventListener('click', () => {
   gameActive = false;
-  net.send({ type: C.LEAVE });
+  if (practiceMode) {
+    practiceMode = false;
+  } else {
+    net.send({ type: C.LEAVE });
+  }
   resetToMenu();
 });
 
 // End game (host only — ends the game for everyone)
 btnEndGame.addEventListener('click', () => {
   net.send({ type: 'END_GAME' });
+});
+
+// --- Practice mode (offline, no server) ---
+let practiceMode = false;
+
+const practiceMap = {
+  name: 'Practice',
+  width: 1600,
+  height: 900,
+  bg: '#7EC8E3',
+  theme: 'sky',
+  platforms: [
+    { x: 0, y: 860, w: 1600, h: 40 },
+    { x: 150, y: 720, w: 200, h: 18 },
+    { x: 500, y: 740, w: 250, h: 18 },
+    { x: 900, y: 720, w: 200, h: 18 },
+    { x: 1250, y: 740, w: 200, h: 18 },
+    { x: 50, y: 580, w: 150, h: 18 },
+    { x: 300, y: 560, w: 180, h: 18 },
+    { x: 650, y: 580, w: 300, h: 18 },
+    { x: 1050, y: 560, w: 180, h: 18 },
+    { x: 1350, y: 580, w: 150, h: 18 },
+    { x: 200, y: 420, w: 160, h: 18 },
+    { x: 500, y: 400, w: 200, h: 18 },
+    { x: 850, y: 420, w: 200, h: 18 },
+    { x: 1150, y: 400, w: 160, h: 18 },
+    { x: 400, y: 260, w: 150, h: 18 },
+    { x: 700, y: 240, w: 200, h: 18 },
+    { x: 1000, y: 260, w: 150, h: 18 },
+    { x: 0, y: 0, w: 20, h: 900 },
+    { x: 1580, y: 0, w: 20, h: 900 },
+  ],
+};
+
+btnPractice.addEventListener('click', () => {
+  practiceMode = true;
+  gameActive = true;
+  currentMap = practiceMap;
+  currentMode = null;
+  lobbyPlayers = [{ id: '0', name: nameInput.value || 'You', color: selectedColor }];
+  myId = '0';
+
+  localPlayer = {
+    x: 400, y: 800,
+    vx: 0, vy: 0,
+    onGround: false, facingRight: true,
+    jumpHeld: false,
+    isIt: false, frozen: false,
+  };
+
+  lastTime = 0;
+  accumulator = 0;
+  showScreen('game');
+  requestAnimationFrame(gameLoop);
 });
 
 modeSelect.addEventListener('change', () => {
@@ -292,7 +351,7 @@ function gameLoop(time) {
     accumulator -= TICK_MS;
     const inp = input.getState();
 
-    if (inp.left !== lastInput.left || inp.right !== lastInput.right || inp.jump !== lastInput.jump) {
+    if (!practiceMode && (inp.left !== lastInput.left || inp.right !== lastInput.right || inp.jump !== lastInput.jump)) {
       net.send({ type: C.INPUT, keys: inp });
       lastInput = { ...inp };
     }
@@ -395,27 +454,35 @@ function render() {
   renderer.applyCamera(camera);
   renderer.drawPlatforms(currentMap.platforms, currentMap.theme);
 
-  const interpPlayers = interp.getInterpolatedPlayers(myId);
-
-  for (const sp of interpPlayers) {
-    const info = lobbyPlayers.find(p => p.id === sp.id);
-    const name = info ? info.name : 'Player';
-    const color = info ? info.color : '#fff';
-
-    if (sp.id === myId && localPlayer) {
-      renderer.drawPlayer(localPlayer.x, localPlayer.y, color, name,
-        localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen);
-    } else {
-      renderer.drawPlayer(sp.x, sp.y, color, name,
-        sp.facingRight, sp.isIt, sp.frozen);
+  if (practiceMode) {
+    // Practice: just draw local player directly
+    if (localPlayer) {
+      renderer.drawPlayer(localPlayer.x, localPlayer.y, selectedColor,
+        lobbyPlayers[0]?.name || 'You', localPlayer.facingRight, false, false);
     }
-  }
+  } else {
+    const interpPlayers = interp.getInterpolatedPlayers(myId);
 
-  if (interpPlayers.length === 0 && localPlayer) {
-    const info = lobbyPlayers.find(p => p.id === myId);
-    renderer.drawPlayer(localPlayer.x, localPlayer.y,
-      info ? info.color : PLAYER_COLORS[0], info ? info.name : 'You',
-      localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen);
+    for (const sp of interpPlayers) {
+      const info = lobbyPlayers.find(p => p.id === sp.id);
+      const name = info ? info.name : 'Player';
+      const color = info ? info.color : '#fff';
+
+      if (sp.id === myId && localPlayer) {
+        renderer.drawPlayer(localPlayer.x, localPlayer.y, color, name,
+          localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen);
+      } else {
+        renderer.drawPlayer(sp.x, sp.y, color, name,
+          sp.facingRight, sp.isIt, sp.frozen);
+      }
+    }
+
+    if (interpPlayers.length === 0 && localPlayer) {
+      const info = lobbyPlayers.find(p => p.id === myId);
+      renderer.drawPlayer(localPlayer.x, localPlayer.y,
+        info ? info.color : PLAYER_COLORS[0], info ? info.name : 'You',
+        localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen);
+    }
   }
 
   // Effects
@@ -456,13 +523,17 @@ function render() {
   }
 
   // HUD
-  renderer.drawHUD(currentMode, getTimeLeft(),
-    localPlayer ? localPlayer.isIt : false,
-    interpPlayers.length || lobbyPlayers.length);
+  if (practiceMode) {
+    renderer.drawHUD('practice', null, false, 1);
+  } else {
+    renderer.drawHUD(currentMode, getTimeLeft(),
+      localPlayer ? localPlayer.isIt : false,
+      lobbyPlayers.length);
+  }
 
   // In-game buttons visibility
   btnQuit.style.display = 'block';
-  btnEndGame.style.display = isHost ? 'block' : 'none';
+  btnEndGame.style.display = (!practiceMode && isHost) ? 'block' : 'none';
 }
 
 function getTimeLeft() {

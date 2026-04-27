@@ -243,6 +243,16 @@ body {
   transform: scale(1.05);
 }
 
+.btn-practice {
+  background: rgba(255,255,255,0.2) !important;
+  color: #fff !important;
+  border: 2px solid rgba(255,255,255,0.3) !important;
+}
+
+.btn-practice:hover {
+  background: rgba(255,255,255,0.3) !important;
+}
+
 .quit-btn {
   bottom: 16px;
   left: 16px;
