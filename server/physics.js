@@ -13,10 +13,10 @@ export function updatePlayer(p, platforms) {
   if (p.input.left) { p.vx = -speed; p.facingRight = false; }
   if (p.input.right) { p.vx = speed; p.facingRight = true; }
 
-  // Wall detection
+  // Wall detection — only allow wall interactions when falling/sliding
   const touchingWallLeft = isTouchingWall(p, platforms, -2);
   const touchingWallRight = isTouchingWall(p, platforms, 2);
-  const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
+  const onWall = !p.onGround && p.vy >= 0 && (touchingWallLeft || touchingWallRight);
 
   // Jump
   if (p.input.jump && !p.jumpHeld) {
@@ -59,6 +59,12 @@ export function updatePlayer(p, platforms) {
         return; // stop on first collision
       }
     }
+  }
+
+  // Clamp to map top — prevent escaping above
+  if (p.y < 0) {
+    p.y = 0;
+    p.vy = 0;
   }
 }
 

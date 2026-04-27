@@ -389,7 +389,7 @@ function predictLocal(p, inp, platforms) {
 
   const touchingWallLeft = isTouchingWall(p, platforms, -2);
   const touchingWallRight = isTouchingWall(p, platforms, 2);
-  const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
+  const onWall = !p.onGround && p.vy >= 0 && (touchingWallLeft || touchingWallRight);
 
   if (inp.jump && !p.jumpHeld) {
     if (p.onGround) {
@@ -432,6 +432,9 @@ function predictLocal(p, inp, platforms) {
       }
     }
   }
+
+  // Clamp to map top
+  if (p.y < 0) { p.y = 0; p.vy = 0; }
 }
 
 function overlaps(p, plat) {
