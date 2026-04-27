@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap');
+
 * {
   margin: 0;
   padding: 0;
@@ -5,9 +7,9 @@
 }
 
 body {
-  background: #0a0a1a;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Nunito', 'Segoe UI', system-ui, sans-serif;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -17,84 +19,107 @@ body {
 
 #game {
   display: none;
-  image-rendering: pixelated;
+  border-radius: 12px;
 }
 
 #lobby {
   text-align: center;
-  max-width: 400px;
+  max-width: 380px;
   width: 90%;
 }
 
 #lobby h1 {
-  font-size: 2.5em;
-  margin-bottom: 0.2em;
-  color: #f1c40f;
-  text-shadow: 0 0 20px rgba(241, 196, 15, 0.3);
+  font-size: 3.5em;
+  font-weight: 900;
+  margin-bottom: 0.1em;
+  color: #fff;
+  text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  letter-spacing: 0.05em;
 }
 
 #lobby .subtitle {
-  color: #888;
-  margin-bottom: 2em;
-  font-size: 0.9em;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 1.8em;
+  font-size: 0.95em;
+  font-weight: 600;
 }
 
 #lobby input, #lobby select, #lobby button {
   display: block;
   width: 100%;
-  padding: 12px 16px;
+  padding: 14px 18px;
   margin-bottom: 10px;
-  border: 2px solid #333;
-  border-radius: 8px;
-  background: #16213e;
+  border: none;
+  border-radius: 50px;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(10px);
   color: #fff;
   font-size: 1em;
+  font-family: inherit;
+  font-weight: 600;
   outline: none;
-  transition: border-color 0.2s;
+  transition: background 0.2s, transform 0.1s;
+}
+
+#lobby input::placeholder {
+  color: rgba(255,255,255,0.5);
 }
 
 #lobby input:focus, #lobby select:focus {
-  border-color: #3498db;
+  background: rgba(255,255,255,0.25);
+}
+
+#lobby select option {
+  background: #4a4a7a;
+  color: #fff;
 }
 
 #lobby button {
   cursor: pointer;
-  font-weight: bold;
-  border-color: transparent;
-  transition: transform 0.1s, background 0.2s;
+  font-weight: 800;
+  font-size: 1.05em;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 
 #lobby button:hover {
-  transform: scale(1.02);
+  transform: scale(1.03);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 #lobby button:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
+}
+
+#lobby button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-create {
-  background: #2ecc71 !important;
-  color: #000 !important;
+  background: linear-gradient(135deg, #43e97b, #38f9d7) !important;
+  color: #1a3a2a !important;
 }
 
 .btn-join {
-  background: #3498db !important;
+  background: linear-gradient(135deg, #4facfe, #00f2fe) !important;
+  color: #1a2a3a !important;
 }
 
 .color-picker {
   display: flex;
   gap: 8px;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .color-swatch {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 3px solid transparent;
   cursor: pointer;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .color-swatch:hover {
@@ -104,56 +129,62 @@ body {
 .color-swatch.selected {
   border-color: #fff;
   transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(255,255,255,0.4);
 }
 
 .divider {
-  color: #555;
-  margin: 16px 0;
+  color: rgba(255,255,255,0.4);
+  margin: 14px 0;
   font-size: 0.85em;
+  font-weight: 600;
 }
 
 #room-info {
   display: none;
   margin-top: 20px;
-  padding: 20px;
-  background: #16213e;
-  border-radius: 12px;
-  border: 1px solid #333;
+  padding: 24px;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(12px);
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.15);
 }
 
 #room-info .room-code {
-  font-size: 2.5em;
-  font-weight: bold;
-  letter-spacing: 0.15em;
-  color: #f1c40f;
-  margin: 10px 0;
+  font-size: 2.8em;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  color: #fff;
+  margin: 8px 0;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
 
 #player-list {
   list-style: none;
-  margin: 16px 0;
+  margin: 14px 0;
   text-align: left;
 }
 
 #player-list li {
-  padding: 6px 12px;
+  padding: 8px 14px;
   margin-bottom: 4px;
-  border-radius: 6px;
-  background: rgba(255,255,255,0.05);
+  border-radius: 50px;
+  background: rgba(255,255,255,0.1);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  font-weight: 600;
 }
 
 .player-dot {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   display: inline-block;
+  box-shadow: 0 0 6px rgba(0,0,0,0.2);
 }
 
 .host-controls {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .host-controls select {
@@ -168,9 +199,11 @@ body {
 }
 
 #game-over h2 {
-  font-size: 2em;
+  font-size: 2.2em;
+  font-weight: 900;
   margin-bottom: 0.5em;
-  color: #f1c40f;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0,0,0,0.2);
 }
 
 #results-list {
@@ -180,46 +213,46 @@ body {
 }
 
 #results-list li {
-  padding: 8px 12px;
-  margin-bottom: 4px;
-  border-radius: 6px;
-  background: rgba(255,255,255,0.05);
+  padding: 10px 16px;
+  margin-bottom: 6px;
+  border-radius: 50px;
+  background: rgba(255,255,255,0.1);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* In-game overlay buttons */
 .game-overlay-btn {
   position: fixed;
-  padding: 8px 18px;
+  padding: 8px 20px;
   border: none;
-  border-radius: 20px;
+  border-radius: 50px;
   font-size: 0.85em;
-  font-weight: bold;
+  font-weight: 800;
+  font-family: inherit;
   cursor: pointer;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+  opacity: 0.4;
+  transition: opacity 0.2s, transform 0.15s;
   z-index: 10;
 }
 
 .game-overlay-btn:hover {
-  opacity: 1;
+  opacity: 0.9;
+  transform: scale(1.05);
 }
 
 .quit-btn {
   bottom: 16px;
   left: 16px;
-  background: rgba(231, 76, 60, 0.8);
+  background: rgba(255,100,100,0.9);
   color: #fff;
 }
 
 .end-btn {
   bottom: 16px;
-  left: 90px;
-  background: rgba(241, 196, 15, 0.8);
-  color: #000;
-}
-
-#lobby button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
+  left: 95px;
+  background: rgba(255,215,0,0.9);
+  color: #333;
 }

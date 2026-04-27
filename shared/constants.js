@@ -1,17 +1,17 @@
 // Physics
 export const TICK_RATE = 60;
 export const TICK_MS = 1000 / TICK_RATE;
-export const SNAPSHOT_INTERVAL = 3; // send snapshot every N ticks
+export const SNAPSHOT_INTERVAL = 3;
 
-export const GRAVITY = 0.6;
-export const MOVE_SPEED = 4;
-export const JUMP_FORCE = -12;
+export const GRAVITY = 0.55;
+export const MOVE_SPEED = 4.5;
+export const JUMP_FORCE = -11.5;
 export const MAX_FALL_SPEED = 10;
 
-export const PLAYER_WIDTH = 36;
-export const PLAYER_HEIGHT = 36;
+export const PLAYER_WIDTH = 34;
+export const PLAYER_HEIGHT = 34;
 
-export const TAG_RADIUS = 40;
+export const TAG_RADIUS = 42;
 export const TAG_IMMUNITY_MS = 3000;
 export const IT_SPEED_BOOST = 1.15;
 
@@ -21,17 +21,17 @@ export const WALL_JUMP_FORCE_Y = -10;
 
 // Game
 export const MAX_PLAYERS = 8;
-export const CLASSIC_ROUND_TIME = 120; // seconds
+export const CLASSIC_ROUND_TIME = 120;
 export const FREEZE_ROUND_TIME = 180;
 export const INFECTION_ROUND_TIME = 180;
-export const UNFREEZE_TIME = 1.5; // seconds standing near to unfreeze
+export const UNFREEZE_TIME = 1.5;
 
 // Rendering
-export const CANVAS_WIDTH = 800;
-export const CANVAS_HEIGHT = 600;
+export const CANVAS_WIDTH = 960;
+export const CANVAS_HEIGHT = 640;
 
-// Player colors
+// Vibrant .io-style player colors
 export const PLAYER_COLORS = [
-  '#e74c3c', '#3498db', '#2ecc71', '#f39c12',
-  '#9b59b6', '#1abc9c', '#e67e22', '#ecf0f1'
+  '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+  '#98D8C8', '#F7DC6F', '#BB8FCE', '#82E0AA'
 ];
