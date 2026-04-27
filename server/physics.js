@@ -7,16 +7,15 @@ import {
 export function updatePlayer(p, platforms) {
   const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
 
-  // Horizontal movement
   p.vx = 0;
-  if (p.frozen) return; // frozen players don't move
+  if (p.frozen) return;
 
   if (p.input.left) { p.vx = -speed; p.facingRight = false; }
   if (p.input.right) { p.vx = speed; p.facingRight = true; }
 
-  // Wall detection (before jump, so wall-jump works)
-  const touchingWallLeft = isTouchingWall(p, platforms, -1);
-  const touchingWallRight = isTouchingWall(p, platforms, 1);
+  // Wall detection
+  const touchingWallLeft = isTouchingWall(p, platforms, -2);
+  const touchingWallRight = isTouchingWall(p, platforms, 2);
   const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
 
   // Jump
@@ -25,7 +24,6 @@ export function updatePlayer(p, platforms) {
       p.vy = JUMP_FORCE;
       p.onGround = false;
     } else if (onWall) {
-      // Wall jump
       p.vy = WALL_JUMP_FORCE_Y;
       p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
       p.facingRight = touchingWallLeft;
@@ -40,28 +38,39 @@ export function updatePlayer(p, platforms) {
   }
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
-  // Move X
-  p.x += p.vx;
-  for (const plat of platforms) {
-    if (overlaps(p, plat)) {
-      if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
-      else if (p.vx < 0) p.x = plat.x + plat.w;
-      p.vx = 0;
+  // Move X with collision
+  moveAxis(p, platforms, 'x', p.vx);
+
+  // Move Y with collision (substep to prevent clipping through thin platforms)
+  const steps = Math.max(1, Math.ceil(Math.abs(p.vy) / 8));
+  const stepVy = p.vy / steps;
+  p.onGround = false;
+  for (let i = 0; i < steps; i++) {
+    p.y += stepVy;
+    for (const plat of platforms) {
+      if (overlaps(p, plat)) {
+        if (stepVy > 0) {
+          p.y = plat.y - PLAYER_HEIGHT;
+          p.onGround = true;
+        } else {
+          p.y = plat.y + plat.h;
+        }
+        p.vy = 0;
+        return; // stop on first collision
+      }
     }
   }
+}
 
-  // Move Y
-  p.y += p.vy;
-  p.onGround = false;
-  for (const plat of platforms) {
-    if (overlaps(p, plat)) {
-      if (p.vy > 0) {
-        p.y = plat.y - PLAYER_HEIGHT;
-        p.onGround = true;
-      } else if (p.vy < 0) {
-        p.y = plat.y + plat.h;
+function moveAxis(p, platforms, axis, vel) {
+  if (axis === 'x') {
+    p.x += vel;
+    for (const plat of platforms) {
+      if (overlaps(p, plat)) {
+        if (vel > 0) p.x = plat.x - PLAYER_WIDTH;
+        else if (vel < 0) p.x = plat.x + plat.w;
+        p.vx = 0;
       }
-      p.vy = 0;
     }
   }
 }
@@ -83,9 +92,7 @@ function isTouchingWall(p, platforms, dir) {
       testX + PLAYER_WIDTH > plat.x &&
       p.y < plat.y + plat.h &&
       p.y + PLAYER_HEIGHT > plat.y
-    ) {
-      return true;
-    }
+    ) return true;
   }
   return false;
 }

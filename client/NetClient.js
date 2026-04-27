@@ -30,7 +30,10 @@ export class NetClient {
   send(msg) {
     if (this.ws && this.ws.readyState === 1) {
       this.ws.send(JSON.stringify(msg));
+      return true;
     }
+    console.warn('WebSocket not connected, message dropped:', msg.type);
+    return false;
   }
 
   on(type, fn) {

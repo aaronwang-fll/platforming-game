@@ -12,7 +12,7 @@ export const PLAYER_WIDTH = 36;
 export const PLAYER_HEIGHT = 36;
 
 export const TAG_RADIUS = 40;
-export const TAG_IMMUNITY_MS = 1000;
+export const TAG_IMMUNITY_MS = 3000;
 export const IT_SPEED_BOOST = 1.15;
 
 export const WALL_SLIDE_SPEED = 2;

@@ -97,6 +97,14 @@ wss.on('connection', (ws) => {
         if (room) room.returnToLobby(ws._playerId);
         break;
       }
+
+      case 'END_GAME': {
+        const room = rooms.get(ws._roomCode);
+        if (room && ws._playerId === room.hostId) {
+          room.endGame([]);
+        }
+        break;
+      }
     }
   });
 

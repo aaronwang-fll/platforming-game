@@ -185,3 +185,41 @@ body {
   border-radius: 6px;
   background: rgba(255,255,255,0.05);
 }
+
+/* In-game overlay buttons */
+.game-overlay-btn {
+  position: fixed;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 20px;
+  font-size: 0.85em;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.game-overlay-btn:hover {
+  opacity: 1;
+}
+
+.quit-btn {
+  bottom: 16px;
+  left: 16px;
+  background: rgba(231, 76, 60, 0.8);
+  color: #fff;
+}
+
+.end-btn {
+  bottom: 16px;
+  left: 90px;
+  background: rgba(241, 196, 15, 0.8);
+  color: #000;
+}
+
+#lobby button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
