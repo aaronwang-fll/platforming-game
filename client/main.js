@@ -204,19 +204,23 @@ net.on(S.SNAPSHOT, (msg) => {
     interp.buffer[interp.buffer.length - 1].timeLeft = msg.timeLeft;
   }
 
-  // Reconcile local player with server
+  // Reconcile local player with server (gentle nudge to avoid jitter)
   if (localPlayer) {
     const serverMe = msg.players.find(p => p.id === myId);
     if (serverMe) {
       const dx = serverMe.x - localPlayer.x;
       const dy = serverMe.y - localPlayer.y;
-      if (Math.abs(dx) > 50 || Math.abs(dy) > 50) {
+      if (Math.abs(dx) > 80 || Math.abs(dy) > 80) {
+        // Teleport — too far off
         localPlayer.x = serverMe.x;
         localPlayer.y = serverMe.y;
-      } else {
-        localPlayer.x += dx * 0.3;
-        localPlayer.y += dy * 0.3;
+        localPlayer.vy = serverMe.vy || 0;
+      } else if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+        // Gentle nudge — only correct if noticeably off
+        localPlayer.x += dx * 0.1;
+        localPlayer.y += dy * 0.1;
       }
+      // else: close enough, trust client prediction
       localPlayer.isIt = serverMe.isIt;
       localPlayer.frozen = serverMe.frozen;
     }

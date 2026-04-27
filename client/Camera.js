@@ -4,7 +4,7 @@ export class Camera {
   constructor() {
     this.x = 0;
     this.y = 0;
-    this.smoothing = 0.12; // buttery smooth follow
+    this.smoothing = 0.08; // smooth follow, doesn't amplify jitter
   }
 
   follow(targetX, targetY, mapWidth, mapHeight) {
