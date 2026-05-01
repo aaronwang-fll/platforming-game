@@ -18,7 +18,16 @@ export const IT_SPEED_BOOST = 1.15;
 export const WALL_SLIDE_SPEED = 2;
 export const WALL_JUMP_FORCE_X = 6;
 export const WALL_JUMP_FORCE_Y = -10;
-export const WALL_JUMP_COOLDOWN = 30; // ticks before you can wall-jump again
+
+// Smooth movement
+export const MOVE_ACCEL = 0.45;     // lerp factor toward target speed
+export const MOVE_FRICTION = 0.72;  // multiplier when no input (deceleration)
+
+// Double jump (replaces wall-jump cooldown)
+export const DOUBLE_JUMP_FORCE = -10; // slightly weaker than ground jump
+
+// Trampoline
+export const TRAMPOLINE_FORCE = -16;
 
 // Dash
 export const DASH_CHARGE_RATE = 1 / (5 * 60); // fills in 5 seconds (per tick)

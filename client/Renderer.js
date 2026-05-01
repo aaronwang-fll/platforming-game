@@ -134,6 +134,37 @@ export class Renderer {
     for (const p of platforms) {
       const r = Math.min(p.h / 2, 10);
 
+      if (p.type === 'trampoline') {
+        // Trampoline glow
+        ctx.fillStyle = 'rgba(0,255,120,0.15)';
+        pill(ctx, p.x - 4, p.y - 4, p.w + 8, p.h + 8, r + 4);
+        ctx.fill();
+
+        // Trampoline body — bright green/yellow
+        ctx.fillStyle = '#2ECC71';
+        pill(ctx, p.x, p.y, p.w, p.h, r);
+        ctx.fill();
+
+        // Top stripe — bright
+        ctx.fillStyle = '#58D68D';
+        pill(ctx, p.x, p.y, p.w, Math.min(4, p.h * 0.5), r);
+        ctx.fill();
+
+        // Spring zigzag lines
+        ctx.strokeStyle = '#F1C40F';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const zigCount = Math.floor(p.w / 10);
+        for (let i = 0; i <= zigCount; i++) {
+          const zx = p.x + 5 + (i / zigCount) * (p.w - 10);
+          const zy = p.y + (i % 2 === 0 ? 2 : p.h - 2);
+          if (i === 0) ctx.moveTo(zx, zy);
+          else ctx.lineTo(zx, zy);
+        }
+        ctx.stroke();
+        continue;
+      }
+
       // Soft drop shadow
       ctx.fillStyle = 'rgba(0,0,0,0.12)';
       pill(ctx, p.x + 2, p.y + 3, p.w, p.h, r);
@@ -272,20 +303,40 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
 
-    // Dash charge bar (below player)
-    if (dashCharge !== undefined && dashCharge < 1) {
-      const barW = S;
-      const barH = 4;
+    // Dash charge bar (below player) — always visible
+    {
+      const barW = S + 10;
+      const barH = 6;
       const barX = cx - barW / 2;
       const barY = cy + radius + 8;
+      const charge = dashCharge !== undefined ? dashCharge : 1;
+
       // Background
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      pill(ctx, barX, barY, barW, barH, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      pill(ctx, barX, barY, barW, barH, 3);
       ctx.fill();
+      // Border
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 1;
+      pill(ctx, barX, barY, barW, barH, 3);
+      ctx.stroke();
+
       // Fill
-      ctx.fillStyle = dashCharge > 0.9 ? '#FFD700' : 'rgba(255,255,255,0.7)';
-      pill(ctx, barX, barY, barW * dashCharge, barH, 2);
-      ctx.fill();
+      if (charge >= 1) {
+        // Ready — pulsing gold glow
+        const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.006);
+        ctx.fillStyle = `rgba(255,215,0,${pulse})`;
+        pill(ctx, barX + 1, barY + 1, barW - 2, barH - 2, 2);
+        ctx.fill();
+      } else if (charge > 0) {
+        // Charging — gradient white to cyan
+        const grad = ctx.createLinearGradient(barX, barY, barX + barW * charge, barY);
+        grad.addColorStop(0, '#4ECDC4');
+        grad.addColorStop(1, '#fff');
+        ctx.fillStyle = grad;
+        pill(ctx, barX + 1, barY + 1, (barW - 2) * charge, barH - 2, 2);
+        ctx.fill();
+      }
     }
 
     // Name tag — clean pill background
@@ -359,6 +410,71 @@ export class Renderer {
       ctx.fillText('YOU ARE IT!', CANVAS_WIDTH / 2, 68);
       ctx.globalAlpha = 1;
     }
+
+    ctx.textAlign = 'left';
+  }
+
+  drawInstructions() {
+    const ctx = this.ctx;
+    const w = 420, h = 340;
+    const x = (CANVAS_WIDTH - w) / 2;
+    const y = (CANVAS_HEIGHT - h) / 2;
+
+    // Dim background
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Panel
+    ctx.fillStyle = 'rgba(30,30,60,0.95)';
+    pill(ctx, x, y, w, h, 20);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 2;
+    pill(ctx, x, y, w, h, 20);
+    ctx.stroke();
+
+    // Title
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOW TO PLAY', CANVAS_WIDTH / 2, y + 38);
+
+    // Controls list
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'left';
+    const lines = [
+      ['Arrow Keys / WASD', 'Move left & right'],
+      ['Space / W / Up', 'Jump'],
+      ['Jump again in air', 'Double Jump'],
+      ['Jump on wall', 'Wall Jump'],
+      ['Shift', 'Dash (when bar is full)'],
+    ];
+    let ly = y + 70;
+    for (const [key, desc] of lines) {
+      ctx.fillStyle = '#FFD700';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(key, x + 30, ly);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      ctx.font = '13px sans-serif';
+      ctx.fillText(desc, x + 220, ly);
+      ly += 28;
+    }
+
+    // Trampoline note
+    ly += 10;
+    ctx.fillStyle = '#2ECC71';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('Green platforms', x + 30, ly);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Trampolines — bounce high!', x + 220, ly);
+
+    // Close hint
+    ly += 40;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press H or click to close', CANVAS_WIDTH / 2, ly);
 
     ctx.textAlign = 'left';
   }

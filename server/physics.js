@@ -2,16 +2,14 @@ import {
   GRAVITY, MOVE_SPEED, JUMP_FORCE, MAX_FALL_SPEED,
   PLAYER_WIDTH, PLAYER_HEIGHT, IT_SPEED_BOOST,
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
-  WALL_JUMP_COOLDOWN, DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
+  MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
+  DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
 } from '../shared/constants.js';
 
 export function updatePlayer(p, platforms) {
   if (p.frozen) return;
 
   const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
-
-  // Tick down wall-jump cooldown
-  if (p.wallJumpCooldown > 0) p.wallJumpCooldown--;
 
   // --- Dash ---
   // Charge when not dashing
@@ -31,27 +29,40 @@ export function updatePlayer(p, platforms) {
     p.dashTicks--;
     p.vx = p.facingRight ? DASH_SPEED : -DASH_SPEED;
   } else {
-    p.vx = 0;
-    if (p.input.left) { p.vx = -speed; p.facingRight = false; }
-    if (p.input.right) { p.vx = speed; p.facingRight = true; }
+    // Smooth horizontal movement with acceleration/friction
+    let targetVx = 0;
+    if (p.input.left) { targetVx = -speed; p.facingRight = false; }
+    if (p.input.right) { targetVx = speed; p.facingRight = true; }
+
+    if (targetVx !== 0) {
+      p.vx += (targetVx - p.vx) * MOVE_ACCEL;
+    } else {
+      p.vx *= MOVE_FRICTION;
+      if (Math.abs(p.vx) < 0.3) p.vx = 0;
+    }
   }
 
   // --- Wall detection ---
   const touchingWallLeft = isTouchingWall(p, platforms, -2);
   const touchingWallRight = isTouchingWall(p, platforms, 2);
-  const canWallJump = !p.onGround && p.wallJumpCooldown <= 0 && (touchingWallLeft || touchingWallRight);
   const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
 
-  // --- Jump ---
+  // --- Jump / Double Jump / Wall Jump ---
   if (p.input.jump && !p.jumpHeld) {
     if (p.onGround) {
       p.vy = JUMP_FORCE;
       p.onGround = false;
-    } else if (canWallJump) {
-      p.vy = WALL_JUMP_FORCE_Y;
-      p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
-      p.facingRight = touchingWallLeft;
-      p.wallJumpCooldown = WALL_JUMP_COOLDOWN;
+    } else if (p.hasDoubleJump) {
+      if (touchingWallLeft || touchingWallRight) {
+        // Wall jump
+        p.vy = WALL_JUMP_FORCE_Y;
+        p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
+        p.facingRight = touchingWallLeft;
+      } else {
+        // Air double jump
+        p.vy = DOUBLE_JUMP_FORCE;
+      }
+      p.hasDoubleJump = false;
     }
   }
   p.jumpHeld = p.input.jump;
@@ -76,13 +87,17 @@ export function updatePlayer(p, platforms) {
       if (overlaps(p, plat)) {
         if (stepVy > 0) {
           p.y = plat.y - PLAYER_HEIGHT;
+          if (plat.type === 'trampoline') {
+            p.vy = TRAMPOLINE_FORCE;
+            p.hasDoubleJump = true;
+            return;
+          }
           p.onGround = true;
         } else {
           p.y = plat.y + plat.h;
         }
         p.vy = 0;
-        // Reset wall-jump cooldown on landing
-        if (p.onGround) p.wallJumpCooldown = 0;
+        if (p.onGround) p.hasDoubleJump = true;
         return;
       }
     }

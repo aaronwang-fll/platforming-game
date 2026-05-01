@@ -7,7 +7,8 @@ import {
   GRAVITY, MOVE_SPEED, JUMP_FORCE, MAX_FALL_SPEED,
   PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_COLORS, IT_SPEED_BOOST,
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
-  WALL_JUMP_COOLDOWN, DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
+  MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
+  DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
 } from '/shared/constants.js';
 import { C, S } from '/shared/protocol.js';
 
@@ -52,6 +53,37 @@ let gameActive = false;
 let localPlayer = null;
 let lastInput = { left: false, right: false, jump: false, dash: false };
 const effects = [];
+let showInstructions = false;
+
+// --- Instructions toggle ---
+window.addEventListener('keydown', e => {
+  if (e.code === 'KeyH' && gameActive) {
+    showInstructions = !showInstructions;
+  }
+});
+canvas.addEventListener('click', () => {
+  if (showInstructions) showInstructions = false;
+});
+document.getElementById('btn-help').addEventListener('click', () => {
+  showInstructions = true;
+  if (!gameActive) {
+    // Show instructions in lobby as a temporary game screen
+    gameActive = true;
+    currentMap = practiceMap;
+    localPlayer = null;
+    showScreen('game');
+    requestAnimationFrame(function showHelp() {
+      if (!showInstructions) {
+        gameActive = false;
+        showScreen('lobby');
+        return;
+      }
+      renderer.clear(currentMap.bg);
+      renderer.drawInstructions();
+      requestAnimationFrame(showHelp);
+    });
+  }
+});
 
 // --- Color picker ---
 PLAYER_COLORS.forEach((color, i) => {
@@ -120,22 +152,28 @@ const practiceMap = {
   theme: 'sky',
   platforms: [
     { x: 0, y: 860, w: 1600, h: 40 },
-    { x: 150, y: 720, w: 200, h: 18 },
-    { x: 500, y: 740, w: 250, h: 18 },
-    { x: 900, y: 720, w: 200, h: 18 },
-    { x: 1250, y: 740, w: 200, h: 18 },
-    { x: 50, y: 580, w: 150, h: 18 },
-    { x: 300, y: 560, w: 180, h: 18 },
-    { x: 650, y: 580, w: 300, h: 18 },
-    { x: 1050, y: 560, w: 180, h: 18 },
-    { x: 1350, y: 580, w: 150, h: 18 },
-    { x: 200, y: 420, w: 160, h: 18 },
-    { x: 500, y: 400, w: 200, h: 18 },
-    { x: 850, y: 420, w: 200, h: 18 },
-    { x: 1150, y: 400, w: 160, h: 18 },
-    { x: 400, y: 260, w: 150, h: 18 },
-    { x: 700, y: 240, w: 200, h: 18 },
-    { x: 1000, y: 260, w: 150, h: 18 },
+    { x: 100, y: 730, w: 220, h: 18 },
+    { x: 420, y: 740, w: 250, h: 18 },
+    { x: 770, y: 730, w: 240, h: 18 },
+    { x: 1100, y: 740, w: 220, h: 18 },
+    { x: 1380, y: 730, w: 180, h: 18 },
+    { x: 60, y: 600, w: 180, h: 18 },
+    { x: 320, y: 590, w: 200, h: 18 },
+    { x: 600, y: 600, w: 260, h: 18 },
+    { x: 940, y: 590, w: 200, h: 18 },
+    { x: 1220, y: 600, w: 180, h: 18 },
+    { x: 1450, y: 590, w: 130, h: 18 },
+    { x: 150, y: 460, w: 180, h: 18 },
+    { x: 430, y: 450, w: 200, h: 18 },
+    { x: 730, y: 460, w: 200, h: 18 },
+    { x: 1030, y: 450, w: 180, h: 18 },
+    { x: 1300, y: 460, w: 160, h: 18 },
+    { x: 300, y: 310, w: 180, h: 18 },
+    { x: 600, y: 300, w: 220, h: 18 },
+    { x: 950, y: 310, w: 180, h: 18 },
+    { x: 720, y: 820, w: 60, h: 12, type: 'trampoline' },
+    { x: 200, y: 550, w: 50, h: 12, type: 'trampoline' },
+    { x: 1200, y: 410, w: 50, h: 12, type: 'trampoline' },
     { x: 0, y: 0, w: 20, h: 900 },
     { x: 1580, y: 0, w: 20, h: 900 },
   ],
@@ -155,7 +193,7 @@ btnPractice.addEventListener('click', () => {
     onGround: false, facingRight: true,
     jumpHeld: false, dashHeld: false,
     isIt: false, frozen: false,
-    wallJumpCooldown: 0,
+    hasDoubleJump: true,
     dashCharge: 1, dashTicks: 0,
   };
 
@@ -247,7 +285,7 @@ net.on(S.GAME_STARTED, (msg) => {
       onGround: false, facingRight: true,
       jumpHeld: false, dashHeld: false,
       isIt: myData.isIt, frozen: myData.frozen,
-      wallJumpCooldown: 0,
+      hasDoubleJump: true,
       dashCharge: 1, dashTicks: 0,
     };
   }
@@ -388,9 +426,6 @@ function isTouchingWall(p, platforms, dir) {
 function predictLocal(p, inp, platforms) {
   const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
 
-  // Wall-jump cooldown
-  if (p.wallJumpCooldown > 0) p.wallJumpCooldown--;
-
   // Dash charge
   if (p.dashTicks <= 0) {
     p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE);
@@ -403,32 +438,44 @@ function predictLocal(p, inp, platforms) {
   }
   p.dashHeld = inp.dash;
 
-  // Movement
+  // Movement (smoothed with acceleration/friction)
   if (p.dashTicks > 0) {
     p.dashTicks--;
     p.vx = p.facingRight ? DASH_SPEED : -DASH_SPEED;
   } else {
-    p.vx = 0;
-    if (inp.left) { p.vx = -speed; p.facingRight = false; }
-    if (inp.right) { p.vx = speed; p.facingRight = true; }
+    let targetVx = 0;
+    if (inp.left) { targetVx = -speed; p.facingRight = false; }
+    if (inp.right) { targetVx = speed; p.facingRight = true; }
+
+    if (targetVx !== 0) {
+      p.vx += (targetVx - p.vx) * MOVE_ACCEL;
+    } else {
+      p.vx *= MOVE_FRICTION;
+      if (Math.abs(p.vx) < 0.3) p.vx = 0;
+    }
   }
 
   // Wall detection
   const touchingWallLeft = isTouchingWall(p, platforms, -2);
   const touchingWallRight = isTouchingWall(p, platforms, 2);
-  const canWallJump = !p.onGround && p.wallJumpCooldown <= 0 && (touchingWallLeft || touchingWallRight);
   const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
 
-  // Jump
+  // Jump / Double Jump / Wall Jump
   if (inp.jump && !p.jumpHeld) {
     if (p.onGround) {
       p.vy = JUMP_FORCE;
       p.onGround = false;
-    } else if (canWallJump) {
-      p.vy = WALL_JUMP_FORCE_Y;
-      p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
-      p.facingRight = touchingWallLeft;
-      p.wallJumpCooldown = WALL_JUMP_COOLDOWN;
+    } else if (p.hasDoubleJump) {
+      if (touchingWallLeft || touchingWallRight) {
+        // Wall jump
+        p.vy = WALL_JUMP_FORCE_Y;
+        p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
+        p.facingRight = touchingWallLeft;
+      } else {
+        // Air double jump
+        p.vy = DOUBLE_JUMP_FORCE;
+      }
+      p.hasDoubleJump = false;
     }
   }
   p.jumpHeld = inp.jump;
@@ -456,10 +503,19 @@ function predictLocal(p, inp, platforms) {
     p.y += stepVy;
     for (const plat of platforms) {
       if (overlaps(p, plat)) {
-        if (stepVy > 0) { p.y = plat.y - PLAYER_HEIGHT; p.onGround = true; }
-        else { p.y = plat.y + plat.h; }
+        if (stepVy > 0) {
+          p.y = plat.y - PLAYER_HEIGHT;
+          if (plat.type === 'trampoline') {
+            p.vy = TRAMPOLINE_FORCE;
+            p.hasDoubleJump = true;
+            return;
+          }
+          p.onGround = true;
+        } else {
+          p.y = plat.y + plat.h;
+        }
         p.vy = 0;
-        if (p.onGround) p.wallJumpCooldown = 0;
+        if (p.onGround) p.hasDoubleJump = true;
         return;
       }
     }
@@ -568,6 +624,11 @@ function render() {
     renderer.drawHUD(currentMode, getTimeLeft(),
       localPlayer ? localPlayer.isIt : false,
       lobbyPlayers.length);
+  }
+
+  // Instructions overlay
+  if (showInstructions) {
+    renderer.drawInstructions();
   }
 
   // In-game buttons visibility

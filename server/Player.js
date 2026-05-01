@@ -22,8 +22,8 @@ export class Player {
     // Unfreeze progress (freeze tag)
     this.unfreezeProgress = 0;
 
-    // Wall-jump cooldown
-    this.wallJumpCooldown = 0;
+    // Double jump (replaces wall-jump cooldown)
+    this.hasDoubleJump = true;
 
     // Dash
     this.dashCharge = 1; // start full
@@ -38,7 +38,7 @@ export class Player {
     this.vy = 0;
     this.onGround = false;
     this.facingRight = true;
-    this.wallJumpCooldown = 0;
+    this.hasDoubleJump = true;
     this.dashCharge = 1;
     this.dashTicks = 0;
   }
