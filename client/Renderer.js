@@ -38,249 +38,247 @@ export class Renderer {
   }
 
   // ========================
-  // BACKGROUNDS — clean, colorful gradients with soft decor
+  // BACKGROUND — clean gradient with subtle checkerboard
   // ========================
 
   drawBackground(map, camera) {
     const ctx = this.ctx;
     const t = map.theme || 'sky';
     const themes = {
-      sky:      ['#7EC8E3', '#4A90D9', '#2C5F8A'],
-      night:    ['#1B2838', '#2C3E6B', '#1A1A3E'],
-      rooftops: ['#1A1A3E', '#2C3E6B', '#0D1B2A'],
-      sunset:   ['#FF9A76', '#FECA57', '#FF6348'],
-      factory:  ['#2C1810', '#4A2C20', '#1A0F0A'],
+      sky:      ['#4A90D9', '#6BB3F0', '#89CFF0'],
+      night:    ['#1A1A3E', '#2C3E6B', '#1B2838'],
+      rooftops: ['#0D1B2A', '#1A1A3E', '#2C3E6B'],
+      sunset:   ['#FF6348', '#FF9A76', '#FECA57'],
+      factory:  ['#1A0F0A', '#2C1810', '#4A2C20'],
     };
     const [c1, c2, c3] = themes[t] || themes.sky;
 
     const grad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
     grad.addColorStop(0, c1);
-    grad.addColorStop(0.6, c2);
+    grad.addColorStop(0.5, c2);
     grad.addColorStop(1, c3);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Subtle grid overlay for depth
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    const gridSize = 48;
+    const offX = (-camera.x * 0.1) % gridSize;
+    const offY = (-camera.y * 0.1) % gridSize;
+    for (let x = offX; x < CANVAS_WIDTH; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, CANVAS_HEIGHT);
+      ctx.stroke();
+    }
+    for (let y = offY; y < CANVAS_HEIGHT; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(CANVAS_WIDTH, y);
+      ctx.stroke();
+    }
   }
 
   drawDecor(map, camera) {
+    // Minimal — just subtle floating particles for atmosphere
     const ctx = this.ctx;
     const t = map.theme || 'sky';
+    const particleColor = (t === 'night' || t === 'rooftops')
+      ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.08)';
 
-    if (t === 'sky' || t === 'night' || t === 'rooftops') {
-      // Soft clouds / shapes parallaxing
-      const cloudColor = t === 'sky' ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)';
-      ctx.fillStyle = cloudColor;
-      for (let i = 0; i < 6; i++) {
-        const cx = ((i * 217 + 80) % (CANVAS_WIDTH + 200)) - camera.x * (0.03 + i * 0.01);
-        const cy = 40 + (i * 73 % 120);
-        const rr = 30 + (i * 19 % 40);
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rr * 2, rr, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    if (t === 'rooftops' || t === 'night') {
-      // Moon
-      ctx.fillStyle = 'rgba(255,240,200,0.9)';
+    ctx.fillStyle = particleColor;
+    for (let i = 0; i < 12; i++) {
+      const px = ((i * 211 + 50) % (CANVAS_WIDTH + 100)) - camera.x * (0.02 + i * 0.005);
+      const py = ((i * 137 + 30) % CANVAS_HEIGHT) + Math.sin(Date.now() * 0.0005 + i) * 8;
+      const size = 3 + (i % 4) * 2;
       ctx.beginPath();
-      ctx.arc(CANVAS_WIDTH - 70, 55, 20, 0, Math.PI * 2);
+      ctx.arc(px, py, size, 0, Math.PI * 2);
       ctx.fill();
-      ctx.fillStyle = t === 'night' ? '#1B2838' : '#1A1A3E';
-      ctx.beginPath();
-      ctx.arc(CANVAS_WIDTH - 62, 50, 18, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Stars
-      ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      for (let i = 0; i < 30; i++) {
-        const sx = (i * 137 + 50) % CANVAS_WIDTH;
-        const sy = (i * 97 + 20) % (CANVAS_HEIGHT * 0.4);
-        ctx.beginPath();
-        ctx.arc(sx, sy, i % 4 === 0 ? 1.5 : 0.8, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    if (t === 'sunset') {
-      // Warm sun glow
-      const grd = ctx.createRadialGradient(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.35, 10, CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.35, 120);
-      grd.addColorStop(0, 'rgba(255,255,200,0.4)');
-      grd.addColorStop(1, 'rgba(255,200,100,0)');
-      ctx.fillStyle = grd;
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    }
-
-    if (t === 'rooftops') {
-      // Background city silhouettes
-      ctx.fillStyle = 'rgba(15,20,40,0.5)';
-      for (let i = 0; i < 8; i++) {
-        const bx = i * 130 - camera.x * 0.08;
-        const bw = 40 + (i * 31 % 50);
-        const bh = 80 + (i * 67 % 150);
-        pill(ctx, bx, CANVAS_HEIGHT - bh, bw, bh, 3);
-        ctx.fill();
-      }
     }
   }
 
   // ========================
-  // PLATFORMS — soft, rounded, colorful with subtle shadows
+  // PLATFORMS — clean, minimalist grey/white blocks
   // ========================
 
   drawPlatforms(platforms, theme) {
     const ctx = this.ctx;
-    const c = platformTheme(theme);
 
     for (const p of platforms) {
-      const r = Math.min(p.h / 2, 10);
-
       if (p.type === 'trampoline') {
-        // Trampoline glow
-        ctx.fillStyle = 'rgba(0,255,120,0.15)';
-        pill(ctx, p.x - 4, p.y - 4, p.w + 8, p.h + 8, r + 4);
-        ctx.fill();
-
-        // Trampoline body — bright green/yellow
+        // Trampoline — bright green with bounce indicator
+        // Glow
+        ctx.shadowColor = '#2ECC71';
+        ctx.shadowBlur = 12;
         ctx.fillStyle = '#2ECC71';
-        pill(ctx, p.x, p.y, p.w, p.h, r);
+        roundRect(ctx, p.x, p.y, p.w, p.h, 3);
         ctx.fill();
+        ctx.shadowBlur = 0;
 
-        // Top stripe — bright
+        // Top highlight
         ctx.fillStyle = '#58D68D';
-        pill(ctx, p.x, p.y, p.w, Math.min(4, p.h * 0.5), r);
-        ctx.fill();
+        ctx.fillRect(p.x + 1, p.y, p.w - 2, Math.min(3, p.h / 2));
 
-        // Spring zigzag lines
+        // Chevrons (bounce indicators)
         ctx.strokeStyle = '#F1C40F';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        const zigCount = Math.floor(p.w / 10);
-        for (let i = 0; i <= zigCount; i++) {
-          const zx = p.x + 5 + (i / zigCount) * (p.w - 10);
-          const zy = p.y + (i % 2 === 0 ? 2 : p.h - 2);
-          if (i === 0) ctx.moveTo(zx, zy);
-          else ctx.lineTo(zx, zy);
+        const midX = p.x + p.w / 2;
+        for (let i = 0; i < 2; i++) {
+          const cy = p.y + 3 + i * 4;
+          ctx.beginPath();
+          ctx.moveTo(midX - 6, cy + 3);
+          ctx.lineTo(midX, cy);
+          ctx.lineTo(midX + 6, cy + 3);
+          ctx.stroke();
         }
-        ctx.stroke();
         continue;
       }
 
-      // Soft drop shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
-      pill(ctx, p.x + 2, p.y + 3, p.w, p.h, r);
+      // Normal platform — clean grey/white block
+      const r = Math.min(4, p.h / 2, p.w / 2);
+
+      // Drop shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      roundRect(ctx, p.x + 1, p.y + 2, p.w, p.h, r);
       ctx.fill();
 
-      // Main body
-      ctx.fillStyle = c.fill;
-      pill(ctx, p.x, p.y, p.w, p.h, r);
+      // Main body — light grey
+      ctx.fillStyle = '#D8DEE4';
+      roundRect(ctx, p.x, p.y, p.w, p.h, r);
       ctx.fill();
 
-      // Top highlight stripe
-      ctx.fillStyle = c.top;
-      pill(ctx, p.x, p.y, p.w, Math.min(5, p.h * 0.4), r);
-      ctx.fill();
+      // Top edge highlight — white
+      ctx.fillStyle = '#EEF1F5';
+      ctx.fillRect(p.x + r, p.y, p.w - r * 2, Math.min(3, p.h * 0.3));
 
-      // Subtle inner bottom shadow
-      if (p.h > 10) {
-        ctx.fillStyle = c.bottom;
-        pill(ctx, p.x, p.y + p.h - Math.min(4, p.h * 0.3), p.w, Math.min(4, p.h * 0.3), r);
-        ctx.fill();
+      // Bottom edge — slightly darker
+      if (p.h > 8) {
+        ctx.fillStyle = '#B8C0CA';
+        ctx.fillRect(p.x + r, p.y + p.h - Math.min(2, p.h * 0.2), p.w - r * 2, Math.min(2, p.h * 0.2));
       }
+
+      // Subtle outline
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+      ctx.lineWidth = 1;
+      roundRect(ctx, p.x, p.y, p.w, p.h, r);
+      ctx.stroke();
     }
   }
 
   // ========================
-  // PLAYER — smooth circle blob with glow, bounce feel
+  // PLAYER — beveled cube/block with clean visuals
   // ========================
 
   drawPlayer(x, y, color, name, facingRight, isIt, isFrozen, dashCharge, dashing) {
     const ctx = this.ctx;
-    // Center of the circle
-    const cx = Math.round(x) + HALF;
-    const cy = Math.round(y) + HALF;
-    const radius = HALF;
+    const px = Math.round(x);
+    const py = Math.round(y);
+    const cx = px + HALF;
+    const cy = py + HALF;
+    const bevel = 4;
 
     const bodyColor = isFrozen ? '#A8D8EA' : color;
     const [cr, cg, cb] = hexRgb(bodyColor);
 
-    // Soft ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    // Ground shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
     ctx.beginPath();
-    ctx.ellipse(cx, cy + radius + 3, radius * 0.8, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, py + S + 3, S * 0.4, 3, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // "IT" glow ring
     if (isIt) {
-      ctx.fillStyle = 'rgba(255,80,80,0.2)';
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius + 10, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255,100,100,0.5)';
-      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(255,255,255,0.8)';
+      ctx.shadowBlur = 16;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 3;
+      roundRect(ctx, px - 4, py - 4, S + 8, S + 8, bevel + 3);
       ctx.stroke();
+      ctx.shadowBlur = 0;
     }
 
-    if (isFrozen) ctx.globalAlpha = 0.7;
+    if (isFrozen) ctx.globalAlpha = 0.6;
 
-    // Main body circle
-    const bodyGrad = ctx.createRadialGradient(cx - radius * 0.3, cy - radius * 0.3, radius * 0.1, cx, cy, radius);
-    bodyGrad.addColorStop(0, `rgba(${Math.min(255,cr+60)},${Math.min(255,cg+60)},${Math.min(255,cb+60)},1)`);
-    bodyGrad.addColorStop(0.7, bodyColor);
-    bodyGrad.addColorStop(1, `rgba(${Math.max(0,cr-30)},${Math.max(0,cg-30)},${Math.max(0,cb-30)},1)`);
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    // Dash trail
+    if (dashing) {
+      ctx.globalAlpha = 0.15;
+      const trailDir = facingRight ? -1 : 1;
+      for (let t = 1; t <= 3; t++) {
+        ctx.fillStyle = bodyColor;
+        roundRect(ctx, px + trailDir * t * 12, py + t, S - t * 2, S - t * 2, bevel);
+        ctx.fill();
+      }
+      ctx.globalAlpha = isFrozen ? 0.6 : 1;
+    }
+
+    // Main cube body
+    ctx.fillStyle = bodyColor;
+    roundRect(ctx, px, py, S, S, bevel);
     ctx.fill();
 
-    // Shiny highlight bubble
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(cx - radius * 0.25, cy - radius * 0.3, radius * 0.35, radius * 0.25, -0.3, 0, Math.PI * 2);
-    ctx.fill();
+    // Top bevel — lighter
+    ctx.fillStyle = `rgba(${Math.min(255,cr+50)},${Math.min(255,cg+50)},${Math.min(255,cb+50)},0.6)`;
+    ctx.fillRect(px + bevel, py + 1, S - bevel * 2, bevel);
+
+    // Left bevel — slightly lighter
+    ctx.fillStyle = `rgba(${Math.min(255,cr+30)},${Math.min(255,cg+30)},${Math.min(255,cb+30)},0.4)`;
+    ctx.fillRect(px + 1, py + bevel, bevel - 1, S - bevel * 2);
+
+    // Bottom bevel — darker
+    ctx.fillStyle = `rgba(${Math.max(0,cr-40)},${Math.max(0,cg-40)},${Math.max(0,cb-40)},0.5)`;
+    ctx.fillRect(px + bevel, py + S - bevel, S - bevel * 2, bevel - 1);
+
+    // Right bevel — darker
+    ctx.fillStyle = `rgba(${Math.max(0,cr-30)},${Math.max(0,cg-30)},${Math.max(0,cb-30)},0.4)`;
+    ctx.fillRect(px + S - bevel, py + bevel, bevel - 1, S - bevel * 2);
 
     // Subtle outline
-    ctx.strokeStyle = `rgba(${Math.max(0,cr-40)},${Math.max(0,cg-40)},${Math.max(0,cb-40)},0.4)`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(${Math.max(0,cr-50)},${Math.max(0,cg-50)},${Math.max(0,cb-50)},0.5)`;
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, px, py, S, S, bevel);
     ctx.stroke();
+
+    // Shine spot (top-left)
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    roundRect(ctx, px + 3, py + 3, 8, 8, 3);
+    ctx.fill();
 
     ctx.globalAlpha = 1;
 
-    // Crown for "IT"
+    // "IT" white arrow above head
     if (isIt) {
-      ctx.fillStyle = '#FFD700';
-      const crownY = cy - radius - 4;
+      const arrowX = cx;
+      const bob = Math.sin(Date.now() * 0.005) * 3;
+      const arrowY = py - 16 + bob;
+
+      ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.moveTo(cx - 10, crownY);
-      ctx.lineTo(cx - 7, crownY - 9);
-      ctx.lineTo(cx - 3, crownY - 3);
-      ctx.lineTo(cx, crownY - 11);
-      ctx.lineTo(cx + 3, crownY - 3);
-      ctx.lineTo(cx + 7, crownY - 9);
-      ctx.lineTo(cx + 10, crownY);
+      ctx.moveTo(arrowX, arrowY + 8);
+      ctx.lineTo(arrowX - 6, arrowY);
+      ctx.lineTo(arrowX + 6, arrowY);
       ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#DAA520';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+
+      // Arrow stem
+      ctx.fillRect(arrowX - 2, arrowY - 6, 4, 7);
     }
 
-    // Frozen ice effect
+    // Frozen ice overlay
     if (isFrozen) {
-      ctx.strokeStyle = 'rgba(168,216,234,0.7)';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(168,216,234,0.8)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      roundRect(ctx, px - 2, py - 2, S + 4, S + 4, bevel + 2);
       ctx.stroke();
       ctx.setLineDash([]);
+
       // Ice crystals
-      ctx.fillStyle = 'rgba(200,230,255,0.5)';
+      ctx.fillStyle = 'rgba(200,230,255,0.6)';
       for (let a = 0; a < 3; a++) {
         const angle = a * 2.1 + 0.5;
-        const ix = cx + Math.cos(angle) * (radius + 2);
-        const iy = cy + Math.sin(angle) * (radius + 2);
+        const ix = cx + Math.cos(angle) * (HALF + 3);
+        const iy = cy + Math.sin(angle) * (HALF + 3);
         ctx.beginPath();
         ctx.moveTo(ix, iy - 4);
         ctx.lineTo(ix + 3, iy + 2);
@@ -290,64 +288,41 @@ export class Renderer {
       }
     }
 
-    // Dash trail effect
-    if (dashing) {
-      ctx.globalAlpha = 0.25;
-      const trailDir = facingRight ? -1 : 1;
-      for (let t = 1; t <= 3; t++) {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(cx + trailDir * t * 10, cy, radius - t * 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-    }
-
-    // Dash charge bar (below player) — always visible
+    // Dash charge bar (below player)
     {
-      const barW = S + 10;
-      const barH = 6;
+      const barW = S + 6;
+      const barH = 4;
       const barX = cx - barW / 2;
-      const barY = cy + radius + 8;
+      const barY = py + S + 7;
       const charge = dashCharge !== undefined ? dashCharge : 1;
 
       // Background
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      pill(ctx, barX, barY, barW, barH, 3);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      roundRect(ctx, barX, barY, barW, barH, 2);
       ctx.fill();
-      // Border
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 1;
-      pill(ctx, barX, barY, barW, barH, 3);
-      ctx.stroke();
 
       // Fill
       if (charge >= 1) {
-        // Ready — pulsing gold glow
         const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.006);
         ctx.fillStyle = `rgba(255,215,0,${pulse})`;
-        pill(ctx, barX + 1, barY + 1, barW - 2, barH - 2, 2);
+        roundRect(ctx, barX + 1, barY + 1, barW - 2, barH - 2, 1);
         ctx.fill();
       } else if (charge > 0) {
-        // Charging — gradient white to cyan
-        const grad = ctx.createLinearGradient(barX, barY, barX + barW * charge, barY);
-        grad.addColorStop(0, '#4ECDC4');
-        grad.addColorStop(1, '#fff');
-        ctx.fillStyle = grad;
-        pill(ctx, barX + 1, barY + 1, (barW - 2) * charge, barH - 2, 2);
+        ctx.fillStyle = '#fff';
+        roundRect(ctx, barX + 1, barY + 1, (barW - 2) * charge, barH - 2, 1);
         ctx.fill();
       }
     }
 
-    // Name tag — clean pill background
+    // Name tag
     const nameText = name || 'Player';
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
     const nameW = ctx.measureText(nameText).width + 10;
-    const nameY = cy - radius - (isIt ? 18 : 8);
+    const nameY = py - (isIt ? 24 : 8);
 
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    pill(ctx, cx - nameW / 2, nameY - 9, nameW, 14, 7);
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    roundRect(ctx, cx - nameW / 2, nameY - 9, nameW, 14, 7);
     ctx.fill();
 
     ctx.fillStyle = '#fff';
@@ -356,15 +331,15 @@ export class Renderer {
   }
 
   // ========================
-  // HUD — clean .io style
+  // HUD — clean minimal style
   // ========================
 
   drawHUD(mode, timeLeft, isIt, playerCount) {
     const ctx = this.ctx;
 
-    // Top bar — frosted glass style
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    pill(ctx, 8, 6, CANVAS_WIDTH - 16, 32, 16);
+    // Top bar
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    roundRect(ctx, 8, 6, CANVAS_WIDTH - 16, 30, 15);
     ctx.fill();
 
     // Timer
@@ -372,42 +347,41 @@ export class Renderer {
       const mins = Math.floor(timeLeft / 60);
       const secs = Math.floor(timeLeft % 60);
       ctx.fillStyle = timeLeft < 30 ? '#FF6B6B' : '#fff';
-      ctx.font = 'bold 18px sans-serif';
+      ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${mins}:${secs.toString().padStart(2, '0')}`, CANVAS_WIDTH / 2, 28);
+      ctx.fillText(`${mins}:${secs.toString().padStart(2, '0')}`, CANVAS_WIDTH / 2, 26);
     }
 
     // Mode label
     if (mode) {
       const labels = { classic: 'CLASSIC', freeze: 'FREEZE', infection: 'INFECTION', practice: 'PRACTICE' };
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.font = 'bold 11px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(labels[mode] || mode.toUpperCase(), 22, 26);
+      ctx.fillText(labels[mode] || mode.toUpperCase(), 22, 25);
     }
 
     // Player count
     if (playerCount) {
-      ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      ctx.font = '11px sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '10px sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(`${playerCount} players`, CANVAS_WIDTH - 22, 26);
+      ctx.fillText(`${playerCount} players`, CANVAS_WIDTH - 22, 25);
     }
 
-    // "YOU ARE IT" — big clean banner
+    // "YOU ARE IT" banner
     if (isIt) {
-      const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.004);
+      const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.004);
       ctx.globalAlpha = pulse;
 
-      // Banner pill
-      ctx.fillStyle = 'rgba(255,80,80,0.85)';
-      pill(ctx, CANVAS_WIDTH / 2 - 100, 46, 200, 32, 16);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      roundRect(ctx, CANVAS_WIDTH / 2 - 80, 44, 160, 28, 14);
       ctx.fill();
 
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 16px sans-serif';
+      ctx.fillStyle = '#333';
+      ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('YOU ARE IT!', CANVAS_WIDTH / 2, 68);
+      ctx.fillText('YOU ARE IT!', CANVAS_WIDTH / 2, 63);
       ctx.globalAlpha = 1;
     }
 
@@ -425,12 +399,12 @@ export class Renderer {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     // Panel
-    ctx.fillStyle = 'rgba(30,30,60,0.95)';
-    pill(ctx, x, y, w, h, 20);
+    ctx.fillStyle = 'rgba(20,20,40,0.95)';
+    roundRect(ctx, x, y, w, h, 16);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
-    ctx.lineWidth = 2;
-    pill(ctx, x, y, w, h, 20);
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, x, y, w, h, 16);
     ctx.stroke();
 
     // Title
@@ -440,7 +414,6 @@ export class Renderer {
     ctx.fillText('HOW TO PLAY', CANVAS_WIDTH / 2, y + 38);
 
     // Controls list
-    ctx.font = '14px sans-serif';
     ctx.textAlign = 'left';
     const lines = [
       ['Arrow Keys / WASD', 'Move left & right'],
@@ -471,7 +444,7 @@ export class Renderer {
 
     // Close hint
     ly += 40;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Press H or click to close', CANVAS_WIDTH / 2, ly);
@@ -484,7 +457,7 @@ export class Renderer {
 // Helpers
 // ========================
 
-function pill(ctx, x, y, w, h, r) {
+function roundRect(ctx, x, y, w, h, r) {
   r = Math.min(r, w / 2, h / 2);
   if (r < 0) r = 0;
   ctx.beginPath();
@@ -505,15 +478,4 @@ function hexRgb(hex) {
   hex = hex.replace('#', '');
   if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
   return [parseInt(hex.substring(0,2),16)||0, parseInt(hex.substring(2,4),16)||0, parseInt(hex.substring(4,6),16)||0];
-}
-
-function platformTheme(theme) {
-  switch (theme) {
-    case 'sky':      return { fill: '#E8F4FD', top: '#ffffff',  bottom: '#C5DCE8' };
-    case 'night':    return { fill: '#2A3A5C', top: '#3D5080',  bottom: '#1E2A45' };
-    case 'rooftops': return { fill: '#3A4A6C', top: '#4D5E84',  bottom: '#2A3852' };
-    case 'sunset':   return { fill: '#D4956B', top: '#E8B08A',  bottom: '#B07850' };
-    case 'factory':  return { fill: '#5A4030', top: '#7A5A42',  bottom: '#3A2818' };
-    default:         return { fill: '#E8F4FD', top: '#ffffff',  bottom: '#C5DCE8' };
-  }
 }
