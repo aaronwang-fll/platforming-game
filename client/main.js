@@ -381,6 +381,8 @@ net.on(S.RETURN_TO_LOBBY, () => {
 let lastTime = 0;
 let accumulator = 0;
 const TICK_MS = 1000 / 60;
+// Render interpolation — store previous position for smooth rendering
+let prevX = 0, prevY = 0;
 
 function gameLoop(time) {
   if (!gameActive) return;
@@ -399,8 +401,13 @@ function gameLoop(time) {
       lastInput = { ...inp };
     }
 
-    if (localPlayer && currentMap && !localPlayer.frozen) {
-      predictLocal(localPlayer, inp, currentMap.platforms);
+    if (localPlayer && currentMap) {
+      // Save position before physics step
+      prevX = localPlayer.x;
+      prevY = localPlayer.y;
+      if (!localPlayer.frozen) {
+        predictLocal(localPlayer, inp, currentMap.platforms);
+      }
     }
   }
 
@@ -539,6 +546,16 @@ function overlaps(p, plat) {
 function render() {
   if (!currentMap) return;
 
+  // Interpolation alpha: how far between prev and current physics tick
+  const alpha = accumulator / TICK_MS;
+
+  // Compute smooth render position for local player
+  let renderX = 0, renderY = 0;
+  if (localPlayer) {
+    renderX = prevX + (localPlayer.x - prevX) * alpha;
+    renderY = prevY + (localPlayer.y - prevY) * alpha;
+  }
+
   renderer.clear(currentMap.bg);
   renderer.drawBackground(currentMap, camera);
   renderer.drawDecor(currentMap, camera);
@@ -546,9 +563,8 @@ function render() {
   renderer.drawPlatforms(currentMap.platforms, currentMap.theme);
 
   if (practiceMode) {
-    // Practice: just draw local player directly
     if (localPlayer) {
-      renderer.drawPlayer(localPlayer.x, localPlayer.y, selectedColor,
+      renderer.drawPlayer(renderX, renderY, selectedColor,
         lobbyPlayers[0]?.name || 'You', localPlayer.facingRight, false, false,
         localPlayer.dashCharge, localPlayer.dashTicks > 0);
     }
@@ -561,7 +577,7 @@ function render() {
       const color = info ? info.color : '#fff';
 
       if (sp.id === myId && localPlayer) {
-        renderer.drawPlayer(localPlayer.x, localPlayer.y, color, name,
+        renderer.drawPlayer(renderX, renderY, color, name,
           localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen,
           localPlayer.dashCharge, localPlayer.dashTicks > 0);
       } else {
@@ -573,7 +589,7 @@ function render() {
 
     if (interpPlayers.length === 0 && localPlayer) {
       const info = lobbyPlayers.find(p => p.id === myId);
-      renderer.drawPlayer(localPlayer.x, localPlayer.y,
+      renderer.drawPlayer(renderX, renderY,
         info ? info.color : PLAYER_COLORS[0], info ? info.name : 'You',
         localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen,
         localPlayer.dashCharge, localPlayer.dashTicks > 0);
@@ -613,7 +629,7 @@ function render() {
   renderer.resetCamera();
 
   if (localPlayer) {
-    camera.follow(localPlayer.x + PLAYER_WIDTH / 2, localPlayer.y + PLAYER_HEIGHT / 2,
+    camera.follow(renderX + PLAYER_WIDTH / 2, renderY + PLAYER_HEIGHT / 2,
       currentMap.width, currentMap.height);
   }
 
