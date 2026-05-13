@@ -1,4 +1,8 @@
-import { TICK_RATE, SNAPSHOT_INTERVAL } from '../shared/constants.js';
+import {
+  TICK_RATE, SNAPSHOT_INTERVAL,
+  PLAYER_WIDTH, PLAYER_HEIGHT,
+  CRUMBLE_DELAY, CRUMBLE_GONE_TIME,
+} from '../shared/constants.js';
 import { updatePlayer } from './physics.js';
 import { ClassicTag } from './modes/ClassicTag.js';
 import { FreezeTag } from './modes/FreezeTag.js';
@@ -18,6 +22,16 @@ export class GameState {
     this.tick = 0;
     this.startTime = Date.now();
     this.interval = null;
+
+    // Deep copy platforms so crumble state is per-game
+    this.platforms = map.platforms.map(p => ({ ...p }));
+    // Init crumble timers
+    for (const p of this.platforms) {
+      if (p.type === 'crumble') {
+        p.timer = 0;
+        p.gone = false;
+      }
+    }
 
     const ModeClass = MODES[modeName] || ClassicTag;
     this.mode = new ModeClass();
@@ -55,9 +69,32 @@ export class GameState {
   update() {
     this.tick++;
 
+    // Update crumble timers
+    for (const plat of this.platforms) {
+      if (plat.type !== 'crumble') continue;
+      if (plat.timer > 0) {
+        plat.timer--;
+        plat.gone = plat.timer > 0 && plat.timer <= CRUMBLE_GONE_TIME;
+      }
+    }
+
     // Update physics for all players
     for (const p of this.players.values()) {
-      updatePlayer(p, this.map.platforms);
+      updatePlayer(p, this.platforms);
+    }
+
+    // Check for players landing on crumble platforms
+    for (const plat of this.platforms) {
+      if (plat.type !== 'crumble' || plat.timer > 0) continue;
+      for (const p of this.players.values()) {
+        if (p.frozen) continue;
+        if (p.onGround &&
+            p.x + PLAYER_WIDTH > plat.x && p.x < plat.x + plat.w &&
+            Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
+          plat.timer = CRUMBLE_DELAY + CRUMBLE_GONE_TIME;
+          break;
+        }
+      }
     }
 
     // Run mode logic
@@ -71,12 +108,22 @@ export class GameState {
 
     // Broadcast snapshot
     if (this.tick % SNAPSHOT_INTERVAL === 0) {
+      // Build crumble state for snapshot
+      const crumble = [];
+      for (let i = 0; i < this.platforms.length; i++) {
+        const plat = this.platforms[i];
+        if (plat.type === 'crumble' && plat.timer > 0) {
+          crumble.push({ i, timer: plat.timer });
+        }
+      }
+
       const snapshot = {
         type: 'SNAPSHOT',
         tick: this.tick,
         elapsed: Math.round(elapsed * 10) / 10,
         timeLeft: Math.max(0, Math.round((this.mode.roundTime - elapsed) * 10) / 10),
         players: [...this.players.values()].map(p => p.toSnapshot()),
+        crumble,
       };
       this.broadcast(snapshot);
     }

@@ -8,10 +8,10 @@ export const MOVE_SPEED = 4.5;
 export const JUMP_FORCE = -11.5;
 export const MAX_FALL_SPEED = 10;
 
-export const PLAYER_WIDTH = 34;
-export const PLAYER_HEIGHT = 34;
+export const PLAYER_WIDTH = 26;
+export const PLAYER_HEIGHT = 26;
 
-export const TAG_RADIUS = 42;
+export const TAG_RADIUS = 34;
 export const TAG_IMMUNITY_MS = 3000;
 export const IT_SPEED_BOOST = 1.15;
 
@@ -26,8 +26,12 @@ export const MOVE_FRICTION = 0.72;  // multiplier when no input (deceleration)
 // Double jump (replaces wall-jump cooldown)
 export const DOUBLE_JUMP_FORCE = -10; // slightly weaker than ground jump
 
-// Trampoline
+// Trampoline / Bounce
 export const TRAMPOLINE_FORCE = -16;
+
+// Crumble blocks
+export const CRUMBLE_DELAY = 12;       // ticks before vanishing (~0.2s)
+export const CRUMBLE_GONE_TIME = 180;  // ticks gone (~3s)
 
 // Dash
 export const DASH_CHARGE_RATE = 1 / (5 * 60); // fills in 5 seconds (per tick)

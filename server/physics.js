@@ -6,6 +6,8 @@ import {
   DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
 } from '../shared/constants.js';
 
+const PASSTHROUGH_TYPES = new Set(['jumpthrough', 'oneway']);
+
 export function updatePlayer(p, platforms) {
   if (p.frozen) return;
 
@@ -74,7 +76,7 @@ export function updatePlayer(p, platforms) {
   }
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
-  // --- Move X ---
+  // --- Move X (skip passthrough and gone platforms) ---
   moveAxis(p, platforms, p.vx);
 
   // --- Move Y (substep) ---
@@ -84,16 +86,27 @@ export function updatePlayer(p, platforms) {
   for (let i = 0; i < steps; i++) {
     p.y += stepVy;
     for (const plat of platforms) {
+      if (plat.gone) continue;
       if (overlaps(p, plat)) {
         if (stepVy > 0) {
+          // Falling — check passthrough: only land if coming from above
+          if (PASSTHROUGH_TYPES.has(plat.type)) {
+            const prevBottom = (p.y - stepVy) + PLAYER_HEIGHT;
+            if (prevBottom > plat.y + 2) continue;
+          }
           p.y = plat.y - PLAYER_HEIGHT;
           if (plat.type === 'trampoline') {
             p.vy = TRAMPOLINE_FORCE;
             p.hasDoubleJump = true;
             return;
           }
+          if (plat.type === 'dash_block') {
+            p.dashCharge = 1;
+          }
           p.onGround = true;
         } else {
+          // Rising — pass through passthrough and crumble-gone platforms
+          if (PASSTHROUGH_TYPES.has(plat.type)) continue;
           p.y = plat.y + plat.h;
         }
         p.vy = 0;
@@ -110,6 +123,8 @@ export function updatePlayer(p, platforms) {
 function moveAxis(p, platforms, vx) {
   p.x += vx;
   for (const plat of platforms) {
+    if (plat.gone) continue;
+    if (PASSTHROUGH_TYPES.has(plat.type)) continue;
     if (overlaps(p, plat)) {
       if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (vx < 0) p.x = plat.x + plat.w;
@@ -130,6 +145,8 @@ function overlaps(p, plat) {
 function isTouchingWall(p, platforms, dir) {
   const testX = p.x + dir;
   for (const plat of platforms) {
+    if (plat.gone) continue;
+    if (PASSTHROUGH_TYPES.has(plat.type)) continue;
     if (
       testX < plat.x + plat.w &&
       testX + PLAYER_WIDTH > plat.x &&
