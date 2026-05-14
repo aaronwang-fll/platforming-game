@@ -15,7 +15,6 @@ export class Camera {
     this.y += (goalY - this.y) * this.smoothing;
 
     this.x = Math.max(0, Math.min(this.x, mapWidth - CANVAS_WIDTH));
-    // Allow camera to go above the map (show sky), but not below
-    this.y = Math.min(this.y, Math.max(0, mapHeight - CANVAS_HEIGHT));
+    this.y = Math.max(0, Math.min(this.y, mapHeight - CANVAS_HEIGHT));
   }
 }

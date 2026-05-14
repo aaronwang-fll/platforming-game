@@ -354,6 +354,61 @@ export class Editor {
       }
     }
 
+    // Fill dead space below blocks down to the floor
+    // For each column, find lowest block and fill below it with solid
+    // Open columns (no blocks) get no fill, leaving a 1-row gap under neighboring fills
+    const floorRow = endRow - 1; // the auto-floor row
+    const fillGrid = []; // track which cells to fill
+    for (let c = startCol; c < endCol; c++) {
+      // Find lowest non-empty cell in this column
+      let lowestBlock = -1;
+      for (let r = maxRow - 1; r >= Math.max(0, minRow); r--) {
+        if ((this.grid[r]?.[c] || 0) !== 0) {
+          lowestBlock = r;
+          break;
+        }
+      }
+      if (lowestBlock >= 0) {
+        // Fill from lowestBlock+1 down to floorRow-1 (above the auto-floor)
+        for (let r = lowestBlock + 1; r < floorRow; r++) {
+          if (!fillGrid[r]) fillGrid[r] = {};
+          fillGrid[r][c] = true;
+        }
+      }
+    }
+
+    // For open columns next to filled columns, remove the bottom fill row (1-row gap)
+    for (let c = startCol; c < endCol; c++) {
+      let hasBlock = false;
+      for (let r = Math.max(0, minRow); r < maxRow; r++) {
+        if ((this.grid[r]?.[c] || 0) !== 0) { hasBlock = true; break; }
+      }
+      if (!hasBlock) {
+        // This is an open column — remove fill in adjacent columns' lowest row
+        // to leave a gap for passage
+        for (let r = floorRow - 1; r >= 0; r--) {
+          if (fillGrid[r]?.[c]) delete fillGrid[r][c];
+        }
+      }
+    }
+
+    // Merge fill cells into platforms (horizontal runs of solid)
+    for (let r = 0; r < floorRow; r++) {
+      if (!fillGrid[r]) continue;
+      let c = startCol;
+      while (c < endCol) {
+        if (!fillGrid[r][c]) { c++; continue; }
+        const sc = c;
+        while (c < endCol && fillGrid[r][c]) c++;
+        platforms.push({
+          x: sc * CELL - offX,
+          y: r * CELL - offY,
+          w: (c - sc) * CELL,
+          h: CELL,
+        });
+      }
+    }
+
     // Find spawn points (pass offset info)
     const spawns = this._findSpawns(8, startCol, startRow, endCol, endRow, offX, offY, mapW, mapH);
 
