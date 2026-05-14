@@ -271,66 +271,64 @@ let practiceMode = false;
 
 const practiceMap = {
   name: 'Practice',
-  width: 1800,
-  height: 1000,
+  width: 1600,
+  height: 900,
   bg: '#7EC8E3',
   theme: 'sky',
   platforms: [
     // Floor
-    { x: 0, y: 968, w: 1800, h: 32 },
+    { x: 0, y: 868, w: 1600, h: 32 },
 
-    // Left structure
-    { x: 32, y: 840, w: 192, h: 32 },
-    { x: 192, y: 712, w: 32, h: 160 },
-    { x: 32, y: 712, w: 192, h: 32 },
-    { x: 32, y: 584, w: 128, h: 32 },
+    // Left room — U-shape
+    { x: 32, y: 740, w: 352, h: 32 },
+    { x: 32, y: 580, w: 32, h: 160 },
+    { x: 352, y: 580, w: 32, h: 96 },
+    { x: 96, y: 644, w: 224, h: 32, type: 'jumpthrough' },
+    { x: 64, y: 580, w: 128, h: 32 },
 
-    // Speed pad left
-    { x: 288, y: 904, w: 320, h: 32, type: 'dash_block' },
+    // Left-to-center corridor
+    { x: 384, y: 740, w: 256, h: 32 },
+    { x: 416, y: 644, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
+    { x: 480, y: 728, w: 64, h: 12, type: 'trampoline' },
 
-    // Center structure
-    { x: 672, y: 840, w: 288, h: 32 },
-    { x: 672, y: 712, w: 32, h: 128 },
-    { x: 928, y: 712, w: 32, h: 128 },
-    { x: 672, y: 712, w: 288, h: 32 },
+    // Center room
+    { x: 608, y: 740, w: 416, h: 32 },
+    { x: 608, y: 548, w: 32, h: 128 },
+    { x: 992, y: 548, w: 32, h: 128 },
+    { x: 608, y: 548, w: 416, h: 32 },
+    { x: 672, y: 708, w: 320, h: 32, type: 'dash_block' },
+    { x: 672, y: 628, w: 288, h: 32, type: 'jumpthrough' },
 
-    // Jumpthrough
-    { x: 448, y: 584, w: 320, h: 32, type: 'jumpthrough' },
-    { x: 928, y: 584, w: 256, h: 32, type: 'jumpthrough' },
+    // Center-to-right corridor
+    { x: 1024, y: 740, w: 192, h: 32 },
+    { x: 1056, y: 580, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
 
-    // Speed pad right
-    { x: 1120, y: 904, w: 320, h: 32, type: 'dash_block' },
+    // Right room — L-shape
+    { x: 1184, y: 740, w: 384, h: 32 },
+    { x: 1536, y: 548, w: 32, h: 192 },
+    { x: 1312, y: 548, w: 256, h: 32 },
+    { x: 1312, y: 612, w: 32, h: 128 },
+    { x: 1216, y: 644, w: 224, h: 32, type: 'jumpthrough' },
 
-    // Right structure
-    { x: 1472, y: 840, w: 192, h: 32 },
-    { x: 1472, y: 712, w: 32, h: 160 },
-    { x: 1472, y: 712, w: 192, h: 32 },
-    { x: 1536, y: 584, w: 128, h: 32 },
+    // Upper level
+    { x: 64, y: 452, w: 128, h: 32 },
+    { x: 256, y: 420, w: 96, h: 32 },
+    { x: 544, y: 420, w: 160, h: 32, type: 'oneway' },
+    { x: 784, y: 388, w: 96, h: 32 },
+    { x: 960, y: 420, w: 160, h: 32, type: 'oneway' },
+    { x: 1216, y: 420, w: 128, h: 32 },
+    { x: 1408, y: 388, w: 96, h: 32 },
 
-    // Crumble bridges
-    { x: 288, y: 712, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
-    { x: 1248, y: 712, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
-
-    // Mid-high
-    { x: 288, y: 456, w: 160, h: 32 },
-    { x: 640, y: 456, w: 192, h: 32 },
-    { x: 1024, y: 456, w: 160, h: 32 },
-    { x: 1344, y: 456, w: 160, h: 32 },
-
-    // Oneway at top
-    { x: 480, y: 328, w: 192, h: 32, type: 'oneway' },
-    { x: 864, y: 328, w: 192, h: 32 },
-    { x: 1216, y: 328, w: 192, h: 32, type: 'oneway' },
-
-    // Trampolines
-    { x: 160, y: 928, w: 64, h: 12, type: 'trampoline' },
-    { x: 1568, y: 928, w: 64, h: 12, type: 'trampoline' },
-    { x: 800, y: 672, w: 48, h: 12, type: 'trampoline' },
-    { x: 1200, y: 544, w: 48, h: 12, type: 'trampoline' },
+    // Ground features
+    { x: 64, y: 836, w: 320, h: 32, type: 'dash_block' },
+    { x: 1216, y: 836, w: 320, h: 32, type: 'dash_block' },
+    { x: 32, y: 856, w: 64, h: 12, type: 'trampoline' },
+    { x: 1504, y: 856, w: 64, h: 12, type: 'trampoline' },
+    { x: 768, y: 856, w: 64, h: 12, type: 'trampoline' },
 
     // Walls
-    { x: 0, y: 0, w: 20, h: 1000 },
-    { x: 1780, y: 0, w: 20, h: 1000 },
+    { x: 0, y: 0, w: 20, h: 900 },
+    { x: 1580, y: 0, w: 20, h: 900 },
   ],
 };
 
@@ -347,7 +345,7 @@ btnPractice.addEventListener('click', () => {
   }
 
   localPlayer = {
-    x: 400, y: 928,
+    x: 400, y: 828,
     vx: 0, vy: 0,
     onGround: false, facingRight: true,
     jumpHeld: false, dashHeld: false,
@@ -768,7 +766,7 @@ function render() {
     if (localPlayer) {
       renderer.drawPlayer(renderX, renderY, selectedColor,
         lobbyPlayers[0]?.name || 'You', localPlayer.facingRight, false, false,
-        localPlayer.dashCharge, localPlayer.dashTicks > 0);
+        localPlayer.dashCharge, localPlayer.dashTicks > 0, localPlayer.vy);
     }
   } else {
     const interpPlayers = interp.getInterpolatedPlayers(myId);
@@ -781,11 +779,11 @@ function render() {
       if (sp.id === myId && localPlayer) {
         renderer.drawPlayer(renderX, renderY, color, name,
           localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen,
-          localPlayer.dashCharge, localPlayer.dashTicks > 0);
+          localPlayer.dashCharge, localPlayer.dashTicks > 0, localPlayer.vy);
       } else {
         renderer.drawPlayer(sp.x, sp.y, color, name,
           sp.facingRight, sp.isIt, sp.frozen,
-          sp.dashCharge, sp.dashing);
+          sp.dashCharge, sp.dashing, sp.vy);
       }
     }
 
@@ -794,7 +792,7 @@ function render() {
       renderer.drawPlayer(renderX, renderY,
         info ? info.color : PLAYER_COLORS[0], info ? info.name : 'You',
         localPlayer.facingRight, localPlayer.isIt, localPlayer.frozen,
-        localPlayer.dashCharge, localPlayer.dashTicks > 0);
+        localPlayer.dashCharge, localPlayer.dashTicks > 0, localPlayer.vy);
     }
   }
 

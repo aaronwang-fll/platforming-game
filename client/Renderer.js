@@ -5,9 +5,12 @@ const HALF = S / 2;
 
 // Vibrant flat platform colors
 const PLAT_COLOR = '#3B2F2F';
+const PLAT_TOP = '#4D3D3D';
 const PLAT_TRAMPOLINE = '#27AE60';
+const PLAT_TRAMPOLINE_TOP = '#2ECC71';
 const PLAT_DASH = '#E67E22';
-const PLAT_CRUMBLE = '#D4A03C';
+const PLAT_DASH_STRIPE = '#F39C12';
+const PLAT_CRUMBLE = '#C8A96E';
 const PLAT_JUMPTHROUGH = '#E056A0';
 const PLAT_ONEWAY = '#8E44AD';
 
@@ -100,35 +103,76 @@ export class Renderer {
   }
 
   // ========================
-  // PLATFORMS — flat vibrant colors
+  // PLATFORMS — flat colors, sharp edges, obvious differences
   // ========================
 
   drawPlatforms(platforms, theme) {
     const ctx = this.ctx;
+    const now = Date.now();
 
     for (const p of platforms) {
       // --- Trampoline ---
       if (p.type === 'trampoline') {
         ctx.fillStyle = PLAT_TRAMPOLINE;
         ctx.fillRect(p.x, p.y, p.w, p.h);
-        // Bright top line
-        ctx.fillStyle = '#58D68D';
-        ctx.fillRect(p.x, p.y, p.w, 3);
+        // Bright bouncy top
+        ctx.fillStyle = PLAT_TRAMPOLINE_TOP;
+        ctx.fillRect(p.x, p.y, p.w, 4);
+        // Animated bounce indicator (chevrons pulsing)
+        const bounce = Math.sin(now * 0.004) * 2;
+        ctx.fillStyle = '#F1C40F';
+        const mx = p.x + p.w / 2;
+        ctx.beginPath();
+        ctx.moveTo(mx - 8, p.y + 8 + bounce);
+        ctx.lineTo(mx, p.y + 3 + bounce);
+        ctx.lineTo(mx + 8, p.y + 8 + bounce);
+        ctx.lineTo(mx + 5, p.y + 8 + bounce);
+        ctx.lineTo(mx, p.y + 5 + bounce);
+        ctx.lineTo(mx - 5, p.y + 8 + bounce);
+        ctx.closePath();
+        ctx.fill();
         continue;
       }
 
-      // --- Dash/Speed Block ---
+      // --- Dash/Speed Block --- VERY OBVIOUS
       if (p.type === 'dash_block') {
+        // Bright orange base
         ctx.fillStyle = PLAT_DASH;
         ctx.fillRect(p.x, p.y, p.w, p.h);
-        // Lighter top edge
-        ctx.fillStyle = '#F0A04B';
-        ctx.fillRect(p.x, p.y, p.w, 3);
-        // Speed stripes
-        ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        for (let sx = p.x + 12; sx < p.x + p.w - 8; sx += 24) {
-          ctx.fillRect(sx, p.y + 6, 10, p.h - 12);
+
+        // Animated speed arrows sliding along the platform
+        const arrowOffset = (now * 0.15) % 40;
+        ctx.fillStyle = PLAT_DASH_STRIPE;
+        for (let ax = p.x - 40 + arrowOffset; ax < p.x + p.w; ax += 40) {
+          const clampL = Math.max(ax, p.x);
+          const clampR = Math.min(ax + 20, p.x + p.w);
+          if (clampR > clampL) {
+            ctx.fillRect(clampL, p.y + 4, clampR - clampL, p.h - 8);
+          }
         }
+
+        // Arrow chevrons pointing right (direction indicator)
+        ctx.fillStyle = '#FFF';
+        ctx.globalAlpha = 0.5;
+        for (let cx = p.x + 30; cx < p.x + p.w - 10; cx += 60) {
+          ctx.beginPath();
+          ctx.moveTo(cx, p.y + 6);
+          ctx.lineTo(cx + 10, p.y + p.h / 2);
+          ctx.lineTo(cx, p.y + p.h - 6);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // Top highlight
+        ctx.fillStyle = '#F5B041';
+        ctx.fillRect(p.x, p.y, p.w, 3);
+
+        // Pulsing glow border
+        const pulse = 0.3 + 0.3 * Math.sin(now * 0.005);
+        ctx.strokeStyle = `rgba(241,196,15,${pulse})`;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(p.x - 1, p.y - 1, p.w + 2, p.h + 2);
         continue;
       }
 
@@ -140,7 +184,7 @@ export class Renderer {
 
         if (isGone) {
           // Ghost outline
-          ctx.strokeStyle = 'rgba(212,160,60,0.25)';
+          ctx.strokeStyle = 'rgba(200,169,110,0.2)';
           ctx.lineWidth = 1;
           ctx.setLineDash([4, 4]);
           ctx.strokeRect(p.x, p.y, p.w, p.h);
@@ -148,71 +192,92 @@ export class Renderer {
           continue;
         }
 
-        const shakeX = isShaking ? (Math.random() - 0.5) * 3 : 0;
-        const shakeY = isShaking ? (Math.random() - 0.5) * 2 : 0;
+        const shakeX = isShaking ? (Math.random() - 0.5) * 4 : 0;
+        const shakeY = isShaking ? (Math.random() - 0.5) * 3 : 0;
         const dx = p.x + shakeX;
         const dy = p.y + shakeY;
 
-        ctx.globalAlpha = isShaking ? 0.65 : 1;
+        ctx.globalAlpha = isShaking ? 0.55 : 1;
+
+        // Main body — sandy
         ctx.fillStyle = PLAT_CRUMBLE;
         ctx.fillRect(dx, dy, p.w, p.h);
-        // Crack lines
-        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-        ctx.lineWidth = 1;
+
+        // Crack pattern
+        ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+        ctx.lineWidth = 1.5;
+        // Diagonal crack
         ctx.beginPath();
-        ctx.moveTo(dx + p.w * 0.3, dy);
-        ctx.lineTo(dx + p.w * 0.35, dy + p.h);
+        ctx.moveTo(dx + p.w * 0.2, dy);
+        ctx.lineTo(dx + p.w * 0.4, dy + p.h * 0.5);
+        ctx.lineTo(dx + p.w * 0.3, dy + p.h);
         ctx.stroke();
+        // Second crack
         ctx.beginPath();
-        ctx.moveTo(dx + p.w * 0.65, dy);
-        ctx.lineTo(dx + p.w * 0.7, dy + p.h);
+        ctx.moveTo(dx + p.w * 0.7, dy);
+        ctx.lineTo(dx + p.w * 0.6, dy + p.h * 0.6);
+        ctx.lineTo(dx + p.w * 0.75, dy + p.h);
         ctx.stroke();
-        // Top highlight
-        ctx.fillStyle = '#E0B84C';
+
+        // Top edge
+        ctx.fillStyle = '#D4B870';
         ctx.fillRect(dx, dy, p.w, 3);
+
+        // Warning border when shaking
+        if (isShaking) {
+          ctx.strokeStyle = '#E74C3C';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(dx, dy, p.w, p.h);
+        }
+
         ctx.globalAlpha = 1;
         continue;
       }
 
       // --- Jump-Through ---
       if (p.type === 'jumpthrough') {
+        // Semi-transparent pink body
         ctx.fillStyle = PLAT_JUMPTHROUGH;
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.4;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         ctx.globalAlpha = 1;
-        // Solid top edge
+
+        // Bold solid top edge (this is where you land)
         ctx.fillStyle = PLAT_JUMPTHROUGH;
         ctx.fillRect(p.x, p.y, p.w, 4);
-        // Dashed vertical lines
-        ctx.strokeStyle = 'rgba(224,86,160,0.3)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        for (let lx = p.x + 10; lx < p.x + p.w; lx += 14) {
-          ctx.beginPath();
-          ctx.moveTo(lx, p.y + 4);
-          ctx.lineTo(lx, p.y + p.h);
-          ctx.stroke();
+
+        // Dotted pattern showing "pass through"
+        ctx.fillStyle = 'rgba(224,86,160,0.25)';
+        for (let dotX = p.x + 8; dotX < p.x + p.w - 4; dotX += 12) {
+          for (let dotY = p.y + 8; dotY < p.y + p.h - 2; dotY += 10) {
+            ctx.fillRect(dotX, dotY, 4, 4);
+          }
         }
-        ctx.setLineDash([]);
         continue;
       }
 
       // --- One-Way ---
       if (p.type === 'oneway') {
+        // Semi-transparent purple body
         ctx.fillStyle = PLAT_ONEWAY;
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.4;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         ctx.globalAlpha = 1;
-        // Solid top edge
+
+        // Bold solid top
         ctx.fillStyle = PLAT_ONEWAY;
         ctx.fillRect(p.x, p.y, p.w, 4);
+
         // Down arrows
-        ctx.fillStyle = 'rgba(142,68,173,0.5)';
-        for (let ax = p.x + 14; ax < p.x + p.w - 6; ax += 20) {
+        ctx.fillStyle = 'rgba(142,68,173,0.45)';
+        for (let ax = p.x + 14; ax < p.x + p.w - 8; ax += 20) {
+          // Arrow body
+          ctx.fillRect(ax - 2, p.y + 7, 4, p.h - 16);
+          // Arrow head
           ctx.beginPath();
-          ctx.moveTo(ax, p.y + 7);
-          ctx.lineTo(ax + 5, p.y + p.h - 4);
-          ctx.lineTo(ax - 5, p.y + p.h - 4);
+          ctx.moveTo(ax - 5, p.y + p.h - 10);
+          ctx.lineTo(ax + 5, p.y + p.h - 10);
+          ctx.lineTo(ax, p.y + p.h - 4);
           ctx.closePath();
           ctx.fill();
         }
@@ -223,23 +288,46 @@ export class Renderer {
       ctx.fillStyle = PLAT_COLOR;
       ctx.fillRect(p.x, p.y, p.w, p.h);
       // Lighter top edge
-      ctx.fillStyle = '#4D3D3D';
+      ctx.fillStyle = PLAT_TOP;
       ctx.fillRect(p.x, p.y, p.w, 2);
     }
   }
 
   // ========================
-  // PLAYER — simple vibrant cube
+  // PLAYER — simple cube with squash/stretch animations
   // ========================
 
-  drawPlayer(x, y, color, name, facingRight, isIt, isFrozen, dashCharge, dashing) {
+  drawPlayer(x, y, color, name, facingRight, isIt, isFrozen, dashCharge, dashing, vy) {
     const ctx = this.ctx;
-    const px = Math.round(x);
-    const py = Math.round(y);
-    const cx = px + HALF;
-    const cy = py + HALF;
-
     const bodyColor = isFrozen ? '#A8D8EA' : color;
+
+    // --- Squash/stretch based on vertical velocity ---
+    let scaleX = 1, scaleY = 1;
+    if (vy !== undefined && !isFrozen) {
+      if (vy < -5) {
+        // Jumping up — horizontal squash (wider, shorter)
+        const t = Math.min(1, (-vy - 5) / 7);
+        scaleX = 1 + t * 0.18;
+        scaleY = 1 - t * 0.18;
+      } else if (vy > 4) {
+        // Falling — vertical stretch (taller, thinner)
+        const t = Math.min(1, (vy - 4) / 6);
+        scaleX = 1 - t * 0.12;
+        scaleY = 1 + t * 0.18;
+      }
+    }
+
+    // Dash squash (flat and fast looking)
+    if (dashing) {
+      scaleX = 1.2;
+      scaleY = 0.8;
+    }
+
+    const drawW = Math.round(S * scaleX);
+    const drawH = Math.round(S * scaleY);
+    const px = Math.round(x) + Math.round((S - drawW) / 2);
+    const py = Math.round(y) + (S - drawH); // anchor at bottom
+    const cx = px + drawW / 2;
 
     // "IT" glow
     if (isIt) {
@@ -247,7 +335,7 @@ export class Renderer {
       ctx.shadowBlur = 12;
       ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(px - 2, py - 2, S + 4, S + 4);
+      ctx.strokeRect(px - 2, py - 2, drawW + 4, drawH + 4);
       ctx.shadowBlur = 0;
     }
 
@@ -255,31 +343,31 @@ export class Renderer {
 
     // Dash trail
     if (dashing) {
-      ctx.globalAlpha = 0.15;
+      ctx.globalAlpha = 0.12;
       const trailDir = facingRight ? -1 : 1;
       for (let t = 1; t <= 3; t++) {
         ctx.fillStyle = bodyColor;
-        ctx.fillRect(px + trailDir * t * 10, py + t, S - t * 2, S - t * 2);
+        ctx.fillRect(px + trailDir * t * 10, py + t * 2, drawW - t * 3, drawH - t * 2);
       }
       ctx.globalAlpha = isFrozen ? 0.6 : 1;
     }
 
-    // Main cube
+    // Main cube body
     ctx.fillStyle = bodyColor;
-    ctx.fillRect(px, py, S, S);
+    ctx.fillRect(px, py, drawW, drawH);
 
-    // Simple top highlight
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.fillRect(px, py, S, 3);
+    // Top highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillRect(px, py, drawW, 3);
 
-    // Simple bottom shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-    ctx.fillRect(px, py + S - 3, S, 3);
+    // Bottom shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(px, py + drawH - 3, drawW, 3);
 
     // Outline
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(px, py, S, S);
+    ctx.strokeRect(px, py, drawW, drawH);
 
     ctx.globalAlpha = 1;
 
@@ -304,7 +392,7 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(168,216,234,0.8)';
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
-      ctx.strokeRect(px - 2, py - 2, S + 4, S + 4);
+      ctx.strokeRect(px - 2, py - 2, drawW + 4, drawH + 4);
       ctx.setLineDash([]);
     }
 
@@ -312,8 +400,8 @@ export class Renderer {
     {
       const barW = S + 2;
       const barH = 3;
-      const barX = cx - barW / 2;
-      const barY = py + S + 4;
+      const barX = Math.round(x) + HALF - barW / 2;
+      const barY = Math.round(y) + S + 4;
       const charge = dashCharge !== undefined ? dashCharge : 1;
 
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
