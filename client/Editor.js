@@ -294,9 +294,9 @@ export class Editor {
       minCol = 0; minRow = 0; maxCol = 5; maxRow = 5;
     }
 
-    // Add 1 cell padding on left/right for walls, 1 row below for floor
+    // Pad left/right by 1 col for walls, 1 row below for floor, NO ceiling
     const startCol = Math.max(0, minCol - 1);
-    const startRow = Math.max(0, minRow - 1);
+    const startRow = minRow; // no top padding — open sky above
     const endCol = Math.min(this.cols, maxCol + 1);
     const endRow = maxRow + 1; // +1 for auto floor
 
@@ -306,7 +306,7 @@ export class Editor {
     const offY = startRow * CELL;
     const platforms = [];
 
-    // Boundary walls — full height on left and right edges
+    // Left and right walls only — no ceiling
     platforms.push({ x: 0, y: 0, w: 20, h: mapH });
     platforms.push({ x: mapW - 20, y: 0, w: 20, h: mapH });
 
