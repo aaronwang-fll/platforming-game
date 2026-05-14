@@ -335,38 +335,38 @@ export class Editor {
     };
   }
 
-  // Scan the grid to find safe spawn positions
-  // Looks for empty cells with a solid block below (any non-empty, non-trampoline)
+  // Find safe spawn positions by scanning the grid
+  // A valid spawn: solid block (type 1, 3, or 4) below, empty cells above for player
   _findSpawns(count) {
+    // Types you can stand on solidly (not jumpthrough/oneway/trampoline)
+    const SOLID_TYPES = new Set([1, 3, 4]); // solid, dash_block, crumble
     const spots = [];
 
-    // Scan each column from left to right
     for (let c = 1; c < this.cols - 1; c++) {
-      // Scan from top to bottom — find first solid cell, spawn is above it
       for (let r = 1; r < this.rows; r++) {
-        const cellBelow = this.grid[r][c];
-        const cellHere = this.grid[r - 1][c];
-        // Need: solid-ish block below, empty above, and one more empty above for player height
-        if (cellBelow >= 1 && cellBelow !== 2 && cellHere === 0) {
-          const cellAbove = r >= 2 ? this.grid[r - 2][c] : 0;
-          if (cellAbove === 0) {
+        const below = this.grid[r][c];
+        const here = this.grid[r - 1][c];
+        if (SOLID_TYPES.has(below) && here === 0) {
+          // Check there's room for the player (cell above also empty)
+          const above = r >= 2 ? this.grid[r - 2][c] : 0;
+          if (above === 0) {
             spots.push({
               x: c * CELL + (CELL - PLAYER_WIDTH) / 2,
-              y: r * CELL - PLAYER_HEIGHT - 1,
-              col: c,
+              // Place player feet exactly on the platform surface
+              y: r * CELL - PLAYER_HEIGHT,
             });
-            break; // one spot per column
+            break;
           }
         }
       }
     }
 
     if (spots.length === 0) {
-      // Fallback: center of map, near top
-      return [{ x: (this.cols * CELL) / 2, y: CELL * 2 }];
+      // No solid ground found — spawn at top-center
+      return [{ x: (this.cols * CELL) / 2, y: CELL }];
     }
 
-    // Pick `count` evenly spaced from the spots found
+    // Pick evenly spaced spawns
     const result = [];
     for (let i = 0; i < count; i++) {
       const idx = Math.floor(i * spots.length / count);
