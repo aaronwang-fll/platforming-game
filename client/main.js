@@ -1,4 +1,4 @@
-import { Input } from '/client/Input.js';
+import { Input, keyDisplayName } from '/client/Input.js';
 import { Renderer } from '/client/Renderer.js';
 import { Camera } from '/client/Camera.js';
 import { NetClient } from '/client/NetClient.js';
@@ -57,13 +57,135 @@ let localPlayer = null;
 let lastInput = { left: false, right: false, jump: false, dash: false };
 const effects = [];
 let showInstructions = false;
+let crumbleState = new Map();
 
-// Crumble platform state (synced from server, used for rendering & prediction)
-let crumbleState = new Map(); // platformIndex -> timer
+// Double jump option (practice mode)
+let doubleJumpEnabled = localStorage.getItem('tag_doublejump') !== 'false';
+
+// ========================
+// SETTINGS PANEL
+// ========================
+
+const settingsOverlay = document.getElementById('settings-overlay');
+const keybindList = document.getElementById('keybind-list');
+const btnSettings = document.getElementById('btn-settings');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+const btnResetKeys = document.getElementById('btn-reset-keys');
+const optDoubleJump = document.getElementById('opt-double-jump');
+
+optDoubleJump.checked = doubleJumpEnabled;
+optDoubleJump.addEventListener('change', () => {
+  doubleJumpEnabled = optDoubleJump.checked;
+  localStorage.setItem('tag_doublejump', doubleJumpEnabled);
+});
+
+btnSettings.addEventListener('click', () => {
+  settingsOverlay.style.display = 'flex';
+  renderKeybinds();
+});
+
+btnCloseSettings.addEventListener('click', () => {
+  settingsOverlay.style.display = 'none';
+});
+
+settingsOverlay.addEventListener('click', (e) => {
+  if (e.target === settingsOverlay) settingsOverlay.style.display = 'none';
+});
+
+btnResetKeys.addEventListener('click', () => {
+  input.resetBindings();
+  renderKeybinds();
+});
+
+let listeningAction = null;
+let listeningEl = null;
+
+function renderKeybinds() {
+  keybindList.innerHTML = '';
+  const actions = [
+    ['left', 'Move Left'],
+    ['right', 'Move Right'],
+    ['jump', 'Jump'],
+    ['dash', 'Dash'],
+  ];
+  for (const [action, label] of actions) {
+    const row = document.createElement('div');
+    row.className = 'keybind-row';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'keybind-label';
+    labelEl.textContent = label;
+    row.appendChild(labelEl);
+
+    const keysEl = document.createElement('div');
+    keysEl.className = 'keybind-keys';
+
+    for (const code of input.bindings[action]) {
+      const tag = document.createElement('span');
+      tag.className = 'key-tag';
+      tag.textContent = keyDisplayName(code);
+      tag.title = 'Click to remove';
+      tag.addEventListener('click', () => {
+        input.removeKey(action, code);
+        renderKeybinds();
+      });
+      keysEl.appendChild(tag);
+    }
+
+    const addBtn = document.createElement('span');
+    addBtn.className = 'key-add';
+    addBtn.textContent = '+';
+    addBtn.title = 'Press to add a key';
+    addBtn.addEventListener('click', () => {
+      if (listeningEl) {
+        listeningEl.classList.remove('listening');
+        listeningEl.textContent = '+';
+      }
+      listeningAction = action;
+      listeningEl = addBtn;
+      addBtn.classList.add('listening');
+      addBtn.textContent = '...';
+    });
+    keysEl.appendChild(addBtn);
+
+    row.appendChild(keysEl);
+    keybindList.appendChild(row);
+  }
+}
+
+window.addEventListener('keydown', (e) => {
+  if (listeningAction) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.code !== 'Escape') {
+      input.addKey(listeningAction, e.code);
+    }
+    listeningAction = null;
+    if (listeningEl) {
+      listeningEl.classList.remove('listening');
+      listeningEl.textContent = '+';
+      listeningEl = null;
+    }
+    renderKeybinds();
+  }
+}, true);
+
+// ========================
+// ABOUT:BLANK LAUNCHER
+// ========================
+
+document.getElementById('btn-newwindow').addEventListener('click', () => {
+  const w = window.open('about:blank', '_blank');
+  if (!w) { alert('Pop-up blocked! Allow pop-ups for this site.'); return; }
+  const doc = w.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html><head><title>Document</title><style>*{margin:0;padding:0}body{overflow:hidden}iframe{width:100vw;height:100vh;border:none}</style></head><body><iframe src="${window.location.href}"></iframe></body></html>`);
+  doc.close();
+});
 
 // --- Instructions toggle ---
 window.addEventListener('keydown', e => {
-  if (e.code === 'KeyH' && gameActive) {
+  if (e.code === 'KeyH' && gameActive && !listeningAction) {
     showInstructions = !showInstructions;
   }
 });
@@ -130,7 +252,6 @@ btnBackLobby.addEventListener('click', () => {
   net.send({ type: 'RETURN_TO_LOBBY' });
 });
 
-// Quit game (leave room, go back to main menu)
 btnQuit.addEventListener('click', () => {
   gameActive = false;
   if (practiceMode) {
@@ -141,77 +262,75 @@ btnQuit.addEventListener('click', () => {
   resetToMenu();
 });
 
-// End game (host only — ends the game for everyone)
 btnEndGame.addEventListener('click', () => {
   net.send({ type: 'END_GAME' });
 });
 
-// --- Practice mode (offline, no server) ---
+// --- Practice mode ---
 let practiceMode = false;
 
 const practiceMap = {
   name: 'Practice',
-  width: 2000,
-  height: 1200,
+  width: 1800,
+  height: 1000,
   bg: '#7EC8E3',
   theme: 'sky',
   platforms: [
-    // Ground
-    { x: 0, y: 1160, w: 420, h: 40 },
-    { x: 520, y: 1160, w: 380, h: 40 },
-    { x: 1000, y: 1160, w: 420, h: 40 },
-    { x: 1520, y: 1160, w: 480, h: 40 },
+    // Floor
+    { x: 0, y: 968, w: 1800, h: 32 },
 
-    // Level 1
-    { x: 100, y: 1000, w: 150, h: 16 },
-    { x: 460, y: 1010, w: 140, h: 16 },
-    { x: 800, y: 1000, w: 160, h: 16 },
-    { x: 1200, y: 1010, w: 140, h: 16 },
-    { x: 1600, y: 1000, w: 150, h: 16 },
-    { x: 680, y: 1040, w: 100, h: 14, type: 'crumble', timer: 0, gone: false },
+    // Left structure
+    { x: 32, y: 840, w: 192, h: 32 },
+    { x: 192, y: 712, w: 32, h: 160 },
+    { x: 32, y: 712, w: 192, h: 32 },
+    { x: 32, y: 584, w: 128, h: 32 },
 
-    // Level 2
-    { x: 60, y: 820, w: 140, h: 16 },
-    { x: 380, y: 830, w: 130, h: 16 },
-    { x: 650, y: 820, w: 150, h: 10, type: 'jumpthrough' },
-    { x: 960, y: 830, w: 140, h: 16 },
-    { x: 1280, y: 820, w: 130, h: 16 },
-    { x: 1600, y: 830, w: 140, h: 10, type: 'jumpthrough' },
-    { x: 1820, y: 820, w: 60, h: 14, type: 'dash_block' },
+    // Speed pad left
+    { x: 288, y: 904, w: 320, h: 32, type: 'dash_block' },
 
-    // Level 3
-    { x: 160, y: 640, w: 130, h: 16 },
-    { x: 440, y: 650, w: 120, h: 14, type: 'crumble', timer: 0, gone: false },
-    { x: 720, y: 640, w: 140, h: 16 },
-    { x: 1040, y: 650, w: 130, h: 16 },
-    { x: 1340, y: 640, w: 120, h: 10, type: 'jumpthrough' },
-    { x: 1660, y: 650, w: 130, h: 16 },
+    // Center structure
+    { x: 672, y: 840, w: 288, h: 32 },
+    { x: 672, y: 712, w: 32, h: 128 },
+    { x: 928, y: 712, w: 32, h: 128 },
+    { x: 672, y: 712, w: 288, h: 32 },
 
-    // Level 4
-    { x: 280, y: 460, w: 140, h: 16 },
-    { x: 600, y: 470, w: 130, h: 10, type: 'oneway' },
-    { x: 920, y: 460, w: 150, h: 16 },
-    { x: 1260, y: 470, w: 130, h: 14, type: 'crumble', timer: 0, gone: false },
-    { x: 1560, y: 460, w: 140, h: 16 },
+    // Jumpthrough
+    { x: 448, y: 584, w: 320, h: 32, type: 'jumpthrough' },
+    { x: 928, y: 584, w: 256, h: 32, type: 'jumpthrough' },
 
-    // Level 5
-    { x: 450, y: 300, w: 130, h: 16 },
-    { x: 800, y: 290, w: 160, h: 10, type: 'oneway' },
-    { x: 1200, y: 300, w: 130, h: 16 },
+    // Speed pad right
+    { x: 1120, y: 904, w: 320, h: 32, type: 'dash_block' },
+
+    // Right structure
+    { x: 1472, y: 840, w: 192, h: 32 },
+    { x: 1472, y: 712, w: 32, h: 160 },
+    { x: 1472, y: 712, w: 192, h: 32 },
+    { x: 1536, y: 584, w: 128, h: 32 },
+
+    // Crumble bridges
+    { x: 288, y: 712, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
+    { x: 1248, y: 712, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
+
+    // Mid-high
+    { x: 288, y: 456, w: 160, h: 32 },
+    { x: 640, y: 456, w: 192, h: 32 },
+    { x: 1024, y: 456, w: 160, h: 32 },
+    { x: 1344, y: 456, w: 160, h: 32 },
+
+    // Oneway at top
+    { x: 480, y: 328, w: 192, h: 32, type: 'oneway' },
+    { x: 864, y: 328, w: 192, h: 32 },
+    { x: 1216, y: 328, w: 192, h: 32, type: 'oneway' },
 
     // Trampolines
-    { x: 250, y: 1120, w: 50, h: 12, type: 'trampoline' },
-    { x: 1460, y: 1120, w: 50, h: 12, type: 'trampoline' },
-    { x: 540, y: 780, w: 50, h: 12, type: 'trampoline' },
-    { x: 1140, y: 600, w: 50, h: 12, type: 'trampoline' },
-
-    // Dash blocks
-    { x: 380, y: 1120, w: 60, h: 14, type: 'dash_block' },
-    { x: 1100, y: 790, w: 60, h: 14, type: 'dash_block' },
+    { x: 160, y: 928, w: 64, h: 12, type: 'trampoline' },
+    { x: 1568, y: 928, w: 64, h: 12, type: 'trampoline' },
+    { x: 800, y: 672, w: 48, h: 12, type: 'trampoline' },
+    { x: 1200, y: 544, w: 48, h: 12, type: 'trampoline' },
 
     // Walls
-    { x: 0, y: 0, w: 20, h: 1200 },
-    { x: 1980, y: 0, w: 20, h: 1200 },
+    { x: 0, y: 0, w: 20, h: 1000 },
+    { x: 1780, y: 0, w: 20, h: 1000 },
   ],
 };
 
@@ -223,21 +342,17 @@ btnPractice.addEventListener('click', () => {
   lobbyPlayers = [{ id: '0', name: nameInput.value || 'You', color: selectedColor }];
   myId = '0';
 
-  // Reset crumble state for practice
   for (const p of currentMap.platforms) {
-    if (p.type === 'crumble') {
-      p.timer = 0;
-      p.gone = false;
-    }
+    if (p.type === 'crumble') { p.timer = 0; p.gone = false; }
   }
 
   localPlayer = {
-    x: 400, y: 1100,
+    x: 400, y: 928,
     vx: 0, vy: 0,
     onGround: false, facingRight: true,
     jumpHeld: false, dashHeld: false,
     isIt: false, frozen: false,
-    hasDoubleJump: true,
+    hasDoubleJump: doubleJumpEnabled,
     dashCharge: 1, dashTicks: 0,
   };
 
@@ -257,7 +372,6 @@ mapSelect.addEventListener('change', () => {
 
 // --- Network handlers ---
 net.on('connected', () => {
-  console.log('Connected to server');
   btnCreate.disabled = false;
   btnJoin.disabled = false;
   btnCreate.textContent = 'Create Room';
@@ -288,6 +402,7 @@ net.on(S.ROOM_JOINED, (msg) => {
   nameInput.style.display = 'none';
   colorPickerEl.style.display = 'none';
   document.querySelector('.divider').style.display = 'none';
+  document.querySelector('.lobby-bottom-row').style.display = 'none';
 });
 
 net.on(S.PLAYER_JOINED, (msg) => {
@@ -348,15 +463,11 @@ net.on(S.SNAPSHOT, (msg) => {
     interp.buffer[interp.buffer.length - 1].timeLeft = msg.timeLeft;
   }
 
-  // Update crumble state from server
   if (msg.crumble) {
     crumbleState = new Map();
-    for (const c of msg.crumble) {
-      crumbleState.set(c.i, c.timer);
-    }
+    for (const c of msg.crumble) crumbleState.set(c.i, c.timer);
   }
 
-  // Reconcile local player with server
   if (localPlayer) {
     const serverMe = msg.players.find(p => p.id === myId);
     if (serverMe) {
@@ -377,7 +488,6 @@ net.on(S.SNAPSHOT, (msg) => {
   }
 });
 
-// Tag effects
 net.on('tag', (msg) => {
   const t = findPlayerPos(msg.taggedId);
   if (t) spawnEffect('TAG!', t.x, t.y, '#f1c40f');
@@ -451,7 +561,6 @@ function gameLoop(time) {
       prevX = localPlayer.x;
       prevY = localPlayer.y;
 
-      // Practice mode: update crumble timers locally
       if (practiceMode) {
         for (const plat of currentMap.platforms) {
           if (plat.type !== 'crumble') continue;
@@ -465,7 +574,6 @@ function gameLoop(time) {
       if (!localPlayer.frozen) {
         predictLocal(localPlayer, inp, currentMap.platforms);
 
-        // Practice mode: check crumble trigger
         if (practiceMode) {
           for (const plat of currentMap.platforms) {
             if (plat.type !== 'crumble' || plat.timer > 0) continue;
@@ -484,7 +592,7 @@ function gameLoop(time) {
   requestAnimationFrame(gameLoop);
 }
 
-// --- Client prediction (matches server physics) ---
+// --- Client prediction ---
 
 function isTouchingWall(p, platforms, dir) {
   const testX = p.x + dir;
@@ -502,7 +610,7 @@ function isTouchingWall(p, platforms, dir) {
 }
 
 function isPlatGone(plat, platIndex) {
-  if (plat.gone) return true; // practice mode
+  if (plat.gone) return true;
   if (plat.type === 'crumble' && crumbleState.has(platIndex)) {
     const timer = crumbleState.get(platIndex);
     return timer > 0 && timer <= CRUMBLE_GONE_TIME;
@@ -513,19 +621,16 @@ function isPlatGone(plat, platIndex) {
 function predictLocal(p, inp, platforms) {
   const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
 
-  // Dash charge
   if (p.dashTicks <= 0) {
     p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE);
   }
 
-  // Trigger dash
   if (inp.dash && !p.dashHeld && p.dashCharge >= 1 && p.dashTicks <= 0) {
     p.dashTicks = DASH_DURATION;
     p.dashCharge = 0;
   }
   p.dashHeld = inp.dash;
 
-  // Movement
   if (p.dashTicks > 0) {
     p.dashTicks--;
     p.vx = p.facingRight ? DASH_SPEED : -DASH_SPEED;
@@ -542,12 +647,10 @@ function predictLocal(p, inp, platforms) {
     }
   }
 
-  // Wall detection
   const touchingWallLeft = isTouchingWall(p, platforms, -2);
   const touchingWallRight = isTouchingWall(p, platforms, 2);
   const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
 
-  // Jump / Double Jump / Wall Jump
   if (inp.jump && !p.jumpHeld) {
     if (p.onGround) {
       p.vy = JUMP_FORCE;
@@ -565,12 +668,11 @@ function predictLocal(p, inp, platforms) {
   }
   p.jumpHeld = inp.jump;
 
-  // Gravity + wall slide
   p.vy += GRAVITY;
   if (onWall && p.vy > 0 && p.dashTicks <= 0) p.vy = Math.min(p.vy, WALL_SLIDE_SPEED);
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
-  // Move X (skip passthrough and gone platforms)
+  // Move X
   p.x += p.vx;
   for (let i = 0; i < platforms.length; i++) {
     const plat = platforms[i];
@@ -594,7 +696,6 @@ function predictLocal(p, inp, platforms) {
       if (isPlatGone(plat, j)) continue;
       if (overlaps(p, plat)) {
         if (stepVy > 0) {
-          // Falling — passthrough check
           if (PASSTHROUGH_TYPES.has(plat.type)) {
             const prevBottom = (p.y - stepVy) + PLAYER_HEIGHT;
             if (prevBottom > plat.y + 2) continue;
@@ -602,7 +703,7 @@ function predictLocal(p, inp, platforms) {
           p.y = plat.y - PLAYER_HEIGHT;
           if (plat.type === 'trampoline') {
             p.vy = TRAMPOLINE_FORCE;
-            p.hasDoubleJump = true;
+            p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
             return;
           }
           if (plat.type === 'dash_block') {
@@ -614,13 +715,12 @@ function predictLocal(p, inp, platforms) {
           p.y = plat.y + plat.h;
         }
         p.vy = 0;
-        if (p.onGround) p.hasDoubleJump = true;
+        if (p.onGround) p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
         return;
       }
     }
   }
 
-  // Clamp to map top
   if (p.y < 0) { p.y = 0; p.vy = 0; }
 }
 
@@ -651,7 +751,7 @@ function render() {
   renderer.drawDecor(currentMap, camera);
   renderer.applyCamera(camera);
 
-  // Annotate crumble platforms with timer for rendering
+  // Annotate crumble for rendering
   if (!practiceMode && currentMap.platforms) {
     for (let i = 0; i < currentMap.platforms.length; i++) {
       const plat = currentMap.platforms[i];
@@ -704,12 +804,12 @@ function render() {
     e.age++;
     if (e.age > e.maxAge) { effects.splice(i, 1); continue; }
     const progress = e.age / e.maxAge;
-    const alpha = 1 - progress;
+    const a = 1 - progress;
     const rise = progress * 35;
     const scale = 1 + progress * 0.4;
     const ctx = renderer.ctx;
     ctx.save();
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = a;
     for (const pt of e.particles) {
       ctx.fillStyle = e.color;
       const px = e.x + pt.dx * e.age * 0.4;
@@ -735,7 +835,6 @@ function render() {
       currentMap.width, currentMap.height);
   }
 
-  // HUD
   if (practiceMode) {
     renderer.drawHUD('practice', null, false, 1);
   } else {
@@ -744,12 +843,8 @@ function render() {
       lobbyPlayers.length);
   }
 
-  // Instructions overlay
-  if (showInstructions) {
-    renderer.drawInstructions();
-  }
+  if (showInstructions) renderer.drawInstructions();
 
-  // In-game buttons visibility
   btnQuit.style.display = 'block';
   btnEndGame.style.display = (!practiceMode && isHost) ? 'block' : 'none';
 }
@@ -809,6 +904,7 @@ function resetToMenu() {
   nameInput.style.display = '';
   colorPickerEl.style.display = '';
   document.querySelector('.divider').style.display = '';
+  document.querySelector('.lobby-bottom-row').style.display = '';
 }
 
 // --- Boot ---

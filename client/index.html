@@ -18,7 +18,11 @@
     <button class="btn-join" id="btn-join">Join Room</button>
     <div class="divider">- or -</div>
     <button class="btn-practice" id="btn-practice">Practice (Offline)</button>
-    <button class="btn-help" id="btn-help">How to Play</button>
+    <div class="lobby-bottom-row">
+      <button class="btn-secondary" id="btn-help">How to Play</button>
+      <button class="btn-secondary" id="btn-settings">Settings</button>
+      <button class="btn-secondary" id="btn-newwindow">Open in New Tab</button>
+    </div>
 
     <div id="room-info">
       <p>Room Code</p>
@@ -39,6 +43,36 @@
         </select>
         <button class="btn-create" id="btn-start">Start Game</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div id="settings-overlay" style="display:none;">
+    <div id="settings-panel">
+      <h2>Settings</h2>
+
+      <h3>Controls</h3>
+      <p class="settings-hint">Click [+] then press a key to add a binding. Click a key to remove it.</p>
+      <div id="keybind-list"></div>
+      <button class="btn-small" id="btn-reset-keys">Reset to Defaults</button>
+
+      <h3>Options</h3>
+      <label class="toggle-row">
+        <input type="checkbox" id="opt-double-jump" checked>
+        <span>Double Jump</span>
+      </label>
+
+      <h3>Block Guide</h3>
+      <div class="block-guide">
+        <div class="block-entry"><span class="block-swatch" style="background:#3B2F2F"></span><b>Platform</b> &mdash; Solid ground, walls, and structures</div>
+        <div class="block-entry"><span class="block-swatch" style="background:#27AE60"></span><b>Trampoline</b> &mdash; Bounces you high into the air</div>
+        <div class="block-entry"><span class="block-swatch" style="background:#E67E22"></span><b>Speed Pad</b> &mdash; Instantly refills your dash bar</div>
+        <div class="block-entry"><span class="block-swatch" style="background:#D4A03C"></span><b>Crumble</b> &mdash; Disappears shortly after you step on it, then respawns</div>
+        <div class="block-entry"><span class="block-swatch" style="background:#E056A0"></span><b>Jump-Through</b> &mdash; You can jump through from below and land on top</div>
+        <div class="block-entry"><span class="block-swatch" style="background:#8E44AD"></span><b>One-Way</b> &mdash; Can only be landed on from above, pass through from below and sides</div>
+      </div>
+
+      <button class="btn-close" id="btn-close-settings">Close</button>
     </div>
   </div>
 

@@ -3,6 +3,14 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT, CRUMBLE_DELAY
 const S = PLAYER_WIDTH;
 const HALF = S / 2;
 
+// Vibrant flat platform colors
+const PLAT_COLOR = '#3B2F2F';
+const PLAT_TRAMPOLINE = '#27AE60';
+const PLAT_DASH = '#E67E22';
+const PLAT_CRUMBLE = '#D4A03C';
+const PLAT_JUMPTHROUGH = '#E056A0';
+const PLAT_ONEWAY = '#8E44AD';
+
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -60,23 +68,17 @@ export class Renderer {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Subtle grid overlay for depth
+    // Subtle grid
     ctx.strokeStyle = 'rgba(255,255,255,0.03)';
     ctx.lineWidth = 1;
     const gridSize = 48;
     const offX = (-camera.x * 0.1) % gridSize;
     const offY = (-camera.y * 0.1) % gridSize;
     for (let x = offX; x < CANVAS_WIDTH; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, CANVAS_HEIGHT);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_HEIGHT); ctx.stroke();
     }
     for (let y = offY; y < CANVAS_HEIGHT; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(CANVAS_WIDTH, y);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_WIDTH, y); ctx.stroke();
     }
   }
 
@@ -98,7 +100,7 @@ export class Renderer {
   }
 
   // ========================
-  // PLATFORMS
+  // PLATFORMS — flat vibrant colors
   // ========================
 
   drawPlatforms(platforms, theme) {
@@ -107,59 +109,26 @@ export class Renderer {
     for (const p of platforms) {
       // --- Trampoline ---
       if (p.type === 'trampoline') {
-        ctx.shadowColor = '#2ECC71';
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = '#2ECC71';
-        roundRect(ctx, p.x, p.y, p.w, p.h, 3);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
+        ctx.fillStyle = PLAT_TRAMPOLINE;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        // Bright top line
         ctx.fillStyle = '#58D68D';
-        ctx.fillRect(p.x + 1, p.y, p.w - 2, Math.min(3, p.h / 2));
-
-        // Chevrons
-        ctx.strokeStyle = '#F1C40F';
-        ctx.lineWidth = 2;
-        const midX = p.x + p.w / 2;
-        for (let i = 0; i < 2; i++) {
-          const cy = p.y + 3 + i * 4;
-          ctx.beginPath();
-          ctx.moveTo(midX - 6, cy + 3);
-          ctx.lineTo(midX, cy);
-          ctx.lineTo(midX + 6, cy + 3);
-          ctx.stroke();
-        }
+        ctx.fillRect(p.x, p.y, p.w, 3);
         continue;
       }
 
-      // --- Dash Block ---
+      // --- Dash/Speed Block ---
       if (p.type === 'dash_block') {
-        const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.004);
-        ctx.shadowColor = '#F39C12';
-        ctx.shadowBlur = 10 * pulse;
-        ctx.fillStyle = '#F39C12';
-        roundRect(ctx, p.x, p.y, p.w, p.h, 3);
-        ctx.fill();
-        ctx.shadowBlur = 0;
-
-        // Top highlight
-        ctx.fillStyle = '#F7DC6F';
-        ctx.fillRect(p.x + 1, p.y, p.w - 2, Math.min(3, p.h / 2));
-
-        // Lightning bolt icon
-        ctx.fillStyle = '#fff';
-        const mx = p.x + p.w / 2;
-        const my = p.y + p.h / 2;
-        ctx.beginPath();
-        ctx.moveTo(mx - 2, my - 5);
-        ctx.lineTo(mx + 3, my - 5);
-        ctx.lineTo(mx + 1, my - 1);
-        ctx.lineTo(mx + 4, my - 1);
-        ctx.lineTo(mx - 2, my + 5);
-        ctx.lineTo(mx, my + 1);
-        ctx.lineTo(mx - 3, my + 1);
-        ctx.closePath();
-        ctx.fill();
+        ctx.fillStyle = PLAT_DASH;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        // Lighter top edge
+        ctx.fillStyle = '#F0A04B';
+        ctx.fillRect(p.x, p.y, p.w, 3);
+        // Speed stripes
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        for (let sx = p.x + 12; sx < p.x + p.w - 8; sx += 24) {
+          ctx.fillRect(sx, p.y + 6, 10, p.h - 12);
+        }
         continue;
       }
 
@@ -170,79 +139,57 @@ export class Renderer {
         const isShaking = timer > CRUMBLE_GONE_TIME;
 
         if (isGone) {
-          // Ghost outline when gone
-          ctx.strokeStyle = 'rgba(205,133,63,0.2)';
+          // Ghost outline
+          ctx.strokeStyle = 'rgba(212,160,60,0.25)';
           ctx.lineWidth = 1;
-          ctx.setLineDash([3, 3]);
-          roundRect(ctx, p.x, p.y, p.w, p.h, 3);
-          ctx.stroke();
+          ctx.setLineDash([4, 4]);
+          ctx.strokeRect(p.x, p.y, p.w, p.h);
           ctx.setLineDash([]);
           continue;
         }
 
-        // Shake offset when about to vanish
         const shakeX = isShaking ? (Math.random() - 0.5) * 3 : 0;
         const shakeY = isShaking ? (Math.random() - 0.5) * 2 : 0;
         const dx = p.x + shakeX;
         const dy = p.y + shakeY;
 
-        const alpha = isShaking ? 0.6 : 1;
-        ctx.globalAlpha = alpha;
-
-        // Drop shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
-        roundRect(ctx, dx + 1, dy + 2, p.w, p.h, 3);
-        ctx.fill();
-
-        // Main body — warm tan/brown
-        ctx.fillStyle = '#CD853F';
-        roundRect(ctx, dx, dy, p.w, p.h, 3);
-        ctx.fill();
-
+        ctx.globalAlpha = isShaking ? 0.65 : 1;
+        ctx.fillStyle = PLAT_CRUMBLE;
+        ctx.fillRect(dx, dy, p.w, p.h);
         // Crack lines
-        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
         ctx.lineWidth = 1;
-        const cw = p.w;
         ctx.beginPath();
-        ctx.moveTo(dx + cw * 0.3, dy);
-        ctx.lineTo(dx + cw * 0.35, dy + p.h);
+        ctx.moveTo(dx + p.w * 0.3, dy);
+        ctx.lineTo(dx + p.w * 0.35, dy + p.h);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(dx + cw * 0.65, dy);
-        ctx.lineTo(dx + cw * 0.7, dy + p.h);
+        ctx.moveTo(dx + p.w * 0.65, dy);
+        ctx.lineTo(dx + p.w * 0.7, dy + p.h);
         ctx.stroke();
-
         // Top highlight
-        ctx.fillStyle = '#DEB887';
-        ctx.fillRect(dx + 2, dy, p.w - 4, Math.min(3, p.h / 2));
-
+        ctx.fillStyle = '#E0B84C';
+        ctx.fillRect(dx, dy, p.w, 3);
         ctx.globalAlpha = 1;
         continue;
       }
 
-      // --- Jump-Through Block ---
+      // --- Jump-Through ---
       if (p.type === 'jumpthrough') {
-        // Thin, translucent platform with dashed top
-        ctx.fillStyle = 'rgba(100,180,220,0.35)';
-        roundRect(ctx, p.x, p.y, p.w, p.h, 2);
-        ctx.fill();
-
-        // Solid top edge — the "landing" line
-        ctx.strokeStyle = 'rgba(100,180,220,0.8)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(p.x + 2, p.y);
-        ctx.lineTo(p.x + p.w - 2, p.y);
-        ctx.stroke();
-
-        // Dashed lines across body
-        ctx.strokeStyle = 'rgba(100,180,220,0.3)';
+        ctx.fillStyle = PLAT_JUMPTHROUGH;
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.globalAlpha = 1;
+        // Solid top edge
+        ctx.fillStyle = PLAT_JUMPTHROUGH;
+        ctx.fillRect(p.x, p.y, p.w, 4);
+        // Dashed vertical lines
+        ctx.strokeStyle = 'rgba(224,86,160,0.3)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
-        const spacing = 8;
-        for (let lx = p.x + spacing; lx < p.x + p.w - 2; lx += spacing) {
+        for (let lx = p.x + 10; lx < p.x + p.w; lx += 14) {
           ctx.beginPath();
-          ctx.moveTo(lx, p.y + 2);
+          ctx.moveTo(lx, p.y + 4);
           ctx.lineTo(lx, p.y + p.h);
           ctx.stroke();
         }
@@ -250,29 +197,22 @@ export class Renderer {
         continue;
       }
 
-      // --- One-Way Block ---
+      // --- One-Way ---
       if (p.type === 'oneway') {
-        // Translucent purple with arrow indicators
-        ctx.fillStyle = 'rgba(160,100,200,0.35)';
-        roundRect(ctx, p.x, p.y, p.w, p.h, 2);
-        ctx.fill();
-
+        ctx.fillStyle = PLAT_ONEWAY;
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        ctx.globalAlpha = 1;
         // Solid top edge
-        ctx.strokeStyle = 'rgba(160,100,200,0.8)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(p.x + 2, p.y);
-        ctx.lineTo(p.x + p.w - 2, p.y);
-        ctx.stroke();
-
-        // Down arrows showing one-way direction
-        ctx.fillStyle = 'rgba(160,100,200,0.5)';
-        const arrowSpacing = 16;
-        for (let ax = p.x + arrowSpacing; ax < p.x + p.w - 4; ax += arrowSpacing) {
+        ctx.fillStyle = PLAT_ONEWAY;
+        ctx.fillRect(p.x, p.y, p.w, 4);
+        // Down arrows
+        ctx.fillStyle = 'rgba(142,68,173,0.5)';
+        for (let ax = p.x + 14; ax < p.x + p.w - 6; ax += 20) {
           ctx.beginPath();
-          ctx.moveTo(ax, p.y + 3);
-          ctx.lineTo(ax + 3, p.y + p.h - 1);
-          ctx.lineTo(ax - 3, p.y + p.h - 1);
+          ctx.moveTo(ax, p.y + 7);
+          ctx.lineTo(ax + 5, p.y + p.h - 4);
+          ctx.lineTo(ax - 5, p.y + p.h - 4);
           ctx.closePath();
           ctx.fill();
         }
@@ -280,38 +220,16 @@ export class Renderer {
       }
 
       // --- Normal Platform ---
-      const r = Math.min(4, p.h / 2, p.w / 2);
-
-      // Drop shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.2)';
-      roundRect(ctx, p.x + 1, p.y + 2, p.w, p.h, r);
-      ctx.fill();
-
-      // Main body — light grey
-      ctx.fillStyle = '#D8DEE4';
-      roundRect(ctx, p.x, p.y, p.w, p.h, r);
-      ctx.fill();
-
-      // Top edge highlight — white
-      ctx.fillStyle = '#EEF1F5';
-      ctx.fillRect(p.x + r, p.y, p.w - r * 2, Math.min(3, p.h * 0.3));
-
-      // Bottom edge — slightly darker
-      if (p.h > 8) {
-        ctx.fillStyle = '#B8C0CA';
-        ctx.fillRect(p.x + r, p.y + p.h - Math.min(2, p.h * 0.2), p.w - r * 2, Math.min(2, p.h * 0.2));
-      }
-
-      // Subtle outline
-      ctx.strokeStyle = 'rgba(0,0,0,0.1)';
-      ctx.lineWidth = 1;
-      roundRect(ctx, p.x, p.y, p.w, p.h, r);
-      ctx.stroke();
+      ctx.fillStyle = PLAT_COLOR;
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      // Lighter top edge
+      ctx.fillStyle = '#4D3D3D';
+      ctx.fillRect(p.x, p.y, p.w, 2);
     }
   }
 
   // ========================
-  // PLAYER — beveled cube
+  // PLAYER — simple vibrant cube
   // ========================
 
   drawPlayer(x, y, color, name, facingRight, isIt, isFrozen, dashCharge, dashing) {
@@ -320,25 +238,16 @@ export class Renderer {
     const py = Math.round(y);
     const cx = px + HALF;
     const cy = py + HALF;
-    const bevel = 3;
 
     const bodyColor = isFrozen ? '#A8D8EA' : color;
-    const [cr, cg, cb] = hexRgb(bodyColor);
 
-    // Ground shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.beginPath();
-    ctx.ellipse(cx, py + S + 2, S * 0.4, 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // "IT" glow ring
+    // "IT" glow
     if (isIt) {
-      ctx.shadowColor = 'rgba(255,255,255,0.8)';
-      ctx.shadowBlur = 14;
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-      ctx.lineWidth = 2.5;
-      roundRect(ctx, px - 3, py - 3, S + 6, S + 6, bevel + 2);
-      ctx.stroke();
+      ctx.shadowColor = 'rgba(255,255,255,0.7)';
+      ctx.shadowBlur = 12;
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px - 2, py - 2, S + 4, S + 4);
       ctx.shadowBlur = 0;
     }
 
@@ -350,109 +259,73 @@ export class Renderer {
       const trailDir = facingRight ? -1 : 1;
       for (let t = 1; t <= 3; t++) {
         ctx.fillStyle = bodyColor;
-        roundRect(ctx, px + trailDir * t * 10, py + t, S - t * 2, S - t * 2, bevel);
-        ctx.fill();
+        ctx.fillRect(px + trailDir * t * 10, py + t, S - t * 2, S - t * 2);
       }
       ctx.globalAlpha = isFrozen ? 0.6 : 1;
     }
 
-    // Main cube body
+    // Main cube
     ctx.fillStyle = bodyColor;
-    roundRect(ctx, px, py, S, S, bevel);
-    ctx.fill();
+    ctx.fillRect(px, py, S, S);
 
-    // Top bevel — lighter
-    ctx.fillStyle = `rgba(${Math.min(255,cr+50)},${Math.min(255,cg+50)},${Math.min(255,cb+50)},0.6)`;
-    ctx.fillRect(px + bevel, py + 1, S - bevel * 2, bevel);
-
-    // Left bevel — slightly lighter
-    ctx.fillStyle = `rgba(${Math.min(255,cr+30)},${Math.min(255,cg+30)},${Math.min(255,cb+30)},0.4)`;
-    ctx.fillRect(px + 1, py + bevel, bevel - 1, S - bevel * 2);
-
-    // Bottom bevel — darker
-    ctx.fillStyle = `rgba(${Math.max(0,cr-40)},${Math.max(0,cg-40)},${Math.max(0,cb-40)},0.5)`;
-    ctx.fillRect(px + bevel, py + S - bevel, S - bevel * 2, bevel - 1);
-
-    // Right bevel — darker
-    ctx.fillStyle = `rgba(${Math.max(0,cr-30)},${Math.max(0,cg-30)},${Math.max(0,cb-30)},0.4)`;
-    ctx.fillRect(px + S - bevel, py + bevel, bevel - 1, S - bevel * 2);
-
-    // Subtle outline
-    ctx.strokeStyle = `rgba(${Math.max(0,cr-50)},${Math.max(0,cg-50)},${Math.max(0,cb-50)},0.5)`;
-    ctx.lineWidth = 1.5;
-    roundRect(ctx, px, py, S, S, bevel);
-    ctx.stroke();
-
-    // Shine spot (top-left)
+    // Simple top highlight
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    roundRect(ctx, px + 2, py + 2, 6, 6, 2);
-    ctx.fill();
+    ctx.fillRect(px, py, S, 3);
+
+    // Simple bottom shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.fillRect(px, py + S - 3, S, 3);
+
+    // Outline
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, S, S);
 
     ctx.globalAlpha = 1;
 
-    // "IT" white arrow above head
+    // "IT" arrow
     if (isIt) {
       const arrowX = cx;
       const bob = Math.sin(Date.now() * 0.005) * 3;
-      const arrowY = py - 14 + bob;
+      const arrowY = py - 12 + bob;
 
       ctx.fillStyle = '#fff';
       ctx.beginPath();
-      ctx.moveTo(arrowX, arrowY + 7);
+      ctx.moveTo(arrowX, arrowY + 6);
       ctx.lineTo(arrowX - 5, arrowY);
       ctx.lineTo(arrowX + 5, arrowY);
       ctx.closePath();
       ctx.fill();
-
-      // Arrow stem
-      ctx.fillRect(arrowX - 2, arrowY - 5, 4, 6);
+      ctx.fillRect(arrowX - 2, arrowY - 4, 4, 5);
     }
 
-    // Frozen ice overlay
+    // Frozen overlay
     if (isFrozen) {
       ctx.strokeStyle = 'rgba(168,216,234,0.8)';
       ctx.lineWidth = 2;
       ctx.setLineDash([4, 4]);
-      roundRect(ctx, px - 2, py - 2, S + 4, S + 4, bevel + 2);
-      ctx.stroke();
+      ctx.strokeRect(px - 2, py - 2, S + 4, S + 4);
       ctx.setLineDash([]);
-
-      // Ice crystals
-      ctx.fillStyle = 'rgba(200,230,255,0.6)';
-      for (let a = 0; a < 3; a++) {
-        const angle = a * 2.1 + 0.5;
-        const ix = cx + Math.cos(angle) * (HALF + 3);
-        const iy = cy + Math.sin(angle) * (HALF + 3);
-        ctx.beginPath();
-        ctx.moveTo(ix, iy - 3);
-        ctx.lineTo(ix + 2, iy + 2);
-        ctx.lineTo(ix - 2, iy + 2);
-        ctx.closePath();
-        ctx.fill();
-      }
     }
 
-    // Dash charge bar (below player)
+    // Dash charge bar
     {
-      const barW = S + 4;
+      const barW = S + 2;
       const barH = 3;
       const barX = cx - barW / 2;
-      const barY = py + S + 5;
+      const barY = py + S + 4;
       const charge = dashCharge !== undefined ? dashCharge : 1;
 
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      roundRect(ctx, barX, barY, barW, barH, 2);
-      ctx.fill();
+      ctx.fillRect(barX, barY, barW, barH);
 
       if (charge >= 1) {
         const pulse = 0.7 + 0.3 * Math.sin(Date.now() * 0.006);
         ctx.fillStyle = `rgba(255,215,0,${pulse})`;
-        roundRect(ctx, barX + 1, barY + 1, barW - 2, barH - 2, 1);
-        ctx.fill();
+        ctx.fillRect(barX + 1, barY + 1, barW - 2, barH - 2);
       } else if (charge > 0) {
         ctx.fillStyle = '#fff';
-        roundRect(ctx, barX + 1, barY + 1, (barW - 2) * charge, barH - 2, 1);
-        ctx.fill();
+        ctx.fillRect(barX + 1, barY + 1, (barW - 2) * charge, barH - 2);
       }
     }
 
@@ -461,11 +334,10 @@ export class Renderer {
     ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
     const nameW = ctx.measureText(nameText).width + 10;
-    const nameY = py - (isIt ? 22 : 6);
+    const nameY = py - (isIt ? 20 : 4);
 
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    roundRect(ctx, cx - nameW / 2, nameY - 9, nameW, 14, 7);
-    ctx.fill();
+    ctx.fillRect(cx - nameW / 2, nameY - 9, nameW, 14);
 
     ctx.fillStyle = '#fff';
     ctx.fillText(nameText, cx, nameY);
@@ -479,9 +351,8 @@ export class Renderer {
   drawHUD(mode, timeLeft, isIt, playerCount) {
     const ctx = this.ctx;
 
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    roundRect(ctx, 8, 6, CANVAS_WIDTH - 16, 30, 15);
-    ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(8, 6, CANVAS_WIDTH - 16, 28);
 
     if (timeLeft !== null && timeLeft !== undefined) {
       const mins = Math.floor(timeLeft / 60);
@@ -489,7 +360,7 @@ export class Renderer {
       ctx.fillStyle = timeLeft < 30 ? '#FF6B6B' : '#fff';
       ctx.font = 'bold 16px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(`${mins}:${secs.toString().padStart(2, '0')}`, CANVAS_WIDTH / 2, 26);
+      ctx.fillText(`${mins}:${secs.toString().padStart(2, '0')}`, CANVAS_WIDTH / 2, 25);
     }
 
     if (mode) {
@@ -497,28 +368,25 @@ export class Renderer {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.font = 'bold 10px sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(labels[mode] || mode.toUpperCase(), 22, 25);
+      ctx.fillText(labels[mode] || mode.toUpperCase(), 22, 24);
     }
 
     if (playerCount) {
       ctx.fillStyle = 'rgba(255,255,255,0.7)';
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'right';
-      ctx.fillText(`${playerCount} players`, CANVAS_WIDTH - 22, 25);
+      ctx.fillText(`${playerCount} players`, CANVAS_WIDTH - 22, 24);
     }
 
     if (isIt) {
       const pulse = 0.8 + 0.2 * Math.sin(Date.now() * 0.004);
       ctx.globalAlpha = pulse;
-
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
-      roundRect(ctx, CANVAS_WIDTH / 2 - 80, 44, 160, 28, 14);
-      ctx.fill();
-
+      ctx.fillRect(CANVAS_WIDTH / 2 - 80, 42, 160, 26);
       ctx.fillStyle = '#333';
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('YOU ARE IT!', CANVAS_WIDTH / 2, 63);
+      ctx.fillText('YOU ARE IT!', CANVAS_WIDTH / 2, 60);
       ctx.globalAlpha = 1;
     }
 
@@ -527,7 +395,7 @@ export class Renderer {
 
   drawInstructions() {
     const ctx = this.ctx;
-    const w = 440, h = 420;
+    const w = 440, h = 440;
     const x = (CANVAS_WIDTH - w) / 2;
     const y = (CANVAS_HEIGHT - h) / 2;
 
@@ -535,17 +403,15 @@ export class Renderer {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     ctx.fillStyle = 'rgba(20,20,40,0.95)';
-    roundRect(ctx, x, y, w, h, 16);
-    ctx.fill();
+    ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.lineWidth = 1;
-    roundRect(ctx, x, y, w, h, 16);
-    ctx.stroke();
+    ctx.strokeRect(x, y, w, h);
 
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 22px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('HOW TO PLAY', CANVAS_WIDTH / 2, y + 38);
+    ctx.fillText('HOW TO PLAY', CANVAS_WIDTH / 2, y + 34);
 
     ctx.textAlign = 'left';
     const lines = [
@@ -555,76 +421,48 @@ export class Renderer {
       ['Jump on wall', 'Wall Jump'],
       ['Shift', 'Dash (when bar is full)'],
     ];
-    let ly = y + 70;
+    let ly = y + 62;
     for (const [key, desc] of lines) {
       ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 13px sans-serif';
-      ctx.fillText(key, x + 30, ly);
-      ctx.fillStyle = 'rgba(255,255,255,0.85)';
-      ctx.font = '13px sans-serif';
-      ctx.fillText(desc, x + 220, ly);
-      ly += 26;
-    }
-
-    // Block types
-    ly += 12;
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillText('BLOCK TYPES', x + 30, ly);
-    ly += 22;
-
-    const blocks = [
-      ['#2ECC71', 'Trampoline', 'Bounce high!'],
-      ['#F39C12', 'Dash Block', 'Refills your dash'],
-      ['#CD853F', 'Crumble', 'Disappears when stepped on'],
-      ['#64B4DC', 'Jump-Through', 'Pass through from below'],
-      ['#A064C8', 'One-Way', 'Land on top only'],
-    ];
-    for (const [color, name, desc] of blocks) {
-      ctx.fillStyle = color;
-      ctx.fillRect(x + 30, ly - 8, 10, 10);
-      ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.font = 'bold 12px sans-serif';
-      ctx.fillText(name, x + 48, ly);
-      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.fillText(key, x + 24, ly);
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.font = '12px sans-serif';
-      ctx.fillText(desc, x + 220, ly);
-      ly += 22;
+      ctx.fillText(desc, x + 210, ly);
+      ly += 24;
     }
 
     ly += 10;
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText('BLOCK TYPES', x + 24, ly);
+    ly += 20;
+
+    const blocks = [
+      [PLAT_COLOR, 'Platform', 'Solid ground'],
+      [PLAT_TRAMPOLINE, 'Trampoline', 'Bounce high!'],
+      [PLAT_DASH, 'Speed Pad', 'Refills your dash'],
+      [PLAT_CRUMBLE, 'Crumble', 'Disappears when stepped on'],
+      [PLAT_JUMPTHROUGH, 'Jump-Through', 'Pass through from below'],
+      [PLAT_ONEWAY, 'One-Way', 'Land on top only'],
+    ];
+    for (const [color, name, desc] of blocks) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x + 24, ly - 8, 14, 14);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(name, x + 46, ly);
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(desc, x + 210, ly);
+      ly += 20;
+    }
+
+    ly += 14;
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Press H or click to close', CANVAS_WIDTH / 2, ly);
-
     ctx.textAlign = 'left';
   }
-}
-
-// ========================
-// Helpers
-// ========================
-
-function roundRect(ctx, x, y, w, h, r) {
-  r = Math.min(r, w / 2, h / 2);
-  if (r < 0) r = 0;
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
-function hexRgb(hex) {
-  if (!hex || hex[0] !== '#') return [128, 128, 128];
-  hex = hex.replace('#', '');
-  if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-  return [parseInt(hex.substring(0,2),16)||0, parseInt(hex.substring(2,4),16)||0, parseInt(hex.substring(4,6),16)||0];
 }
