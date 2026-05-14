@@ -4,6 +4,7 @@ import {
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
   MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
   DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION, SPEED_PAD_MULTIPLIER,
+  CONVEYOR_SPEED,
 } from '../shared/constants.js';
 
 const PASSTHROUGH_TYPES = new Set(['jumpthrough', 'oneway']);
@@ -21,6 +22,23 @@ export function updatePlayer(p, platforms) {
           Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
         onSpeedPad = true;
         p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE * 4); // faster charge on pad
+        break;
+      }
+    }
+  }
+
+  // Check if player is on a conveyor
+  if (p.onGround) {
+    for (const plat of platforms) {
+      if (plat.gone) continue;
+      if (plat.type === 'conveyor' &&
+          p.x + PLAYER_WIDTH > plat.x && p.x < plat.x + plat.w &&
+          Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
+        const dir = plat.pushDir || 0;
+        if (dir === 0) p.vx += CONVEYOR_SPEED;       // right
+        else if (dir === 1) p.vy += CONVEYOR_SPEED;   // down (will be overridden by gravity mostly)
+        else if (dir === 2) p.vx -= CONVEYOR_SPEED;   // left
+        else if (dir === 3) p.vy -= CONVEYOR_SPEED;   // up
         break;
       }
     }
@@ -105,6 +123,21 @@ export function updatePlayer(p, platforms) {
           }
           p.y = plat.y - PLAYER_HEIGHT;
           if (plat.type === 'trampoline') {
+            const bd = plat.bounceDir;
+            if (bd === undefined || bd === 0) {
+              // Default: bounce up
+              p.vy = TRAMPOLINE_FORCE;
+              p.hasDoubleJump = true;
+              return;
+            } else if (bd === 2) {
+              // Ceiling trampoline bouncing down — shouldn't land on it from above normally
+              // but handle it: bounce up same as default
+              p.vy = TRAMPOLINE_FORCE;
+              p.hasDoubleJump = true;
+              return;
+            }
+            // bounceDir 1 (left) or 3 (right) are wall trampolines, handled in moveAxis
+            // If we somehow land on them, just bounce up
             p.vy = TRAMPOLINE_FORCE;
             p.hasDoubleJump = true;
             return;
@@ -114,7 +147,15 @@ export function updatePlayer(p, platforms) {
           }
           p.onGround = true;
         } else {
+          // Going up, hitting something above
           if (PASSTHROUGH_TYPES.has(plat.type)) continue;
+          // Ceiling trampoline: bounceDir 2 means bounce down
+          if (plat.type === 'trampoline' && plat.bounceDir === 2) {
+            p.y = plat.y + plat.h;
+            p.vy = -TRAMPOLINE_FORCE; // positive = downward
+            p.hasDoubleJump = true;
+            return;
+          }
           p.y = plat.y + plat.h;
         }
         p.vy = 0;
@@ -133,6 +174,25 @@ function moveAxis(p, platforms, vx) {
     if (plat.gone) continue;
     if (PASSTHROUGH_TYPES.has(plat.type)) continue;
     if (overlaps(p, plat)) {
+      // Wall trampoline bounce
+      if (plat.type === 'trampoline') {
+        const bd = plat.bounceDir;
+        if (bd === 1) {
+          // Right-side strip, bounces player left
+          p.x = plat.x - PLAYER_WIDTH;
+          p.vx = TRAMPOLINE_FORCE; // -14, pushes left
+          p.vy = 0;
+          p.hasDoubleJump = true;
+          return;
+        } else if (bd === 3) {
+          // Left-side strip, bounces player right
+          p.x = plat.x + plat.w;
+          p.vx = -TRAMPOLINE_FORCE; // +14, pushes right
+          p.vy = 0;
+          p.hasDoubleJump = true;
+          return;
+        }
+      }
       if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (vx < 0) p.x = plat.x + plat.w;
       p.vx = 0;

@@ -11,6 +11,7 @@ import {
   MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
   DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
   CRUMBLE_DELAY, CRUMBLE_GONE_TIME, SPEED_PAD_MULTIPLIER,
+  CONVEYOR_SPEED,
 } from '/shared/constants.js';
 import { C, S } from '/shared/protocol.js';
 
@@ -394,6 +395,8 @@ const btnEditorResize = document.getElementById('btn-editor-resize');
 const editorColsInput = document.getElementById('editor-cols');
 const editorRowsInput = document.getElementById('editor-rows');
 
+const btnEditorToolbarPos = document.getElementById('btn-editor-toolbar-pos');
+
 document.getElementById('btn-editor').addEventListener('click', () => {
   editorMode = true;
   editor = new Editor(canvas);
@@ -403,9 +406,18 @@ document.getElementById('btn-editor').addEventListener('click', () => {
   btnEndGame.style.display = 'none';
   buildEditorPalette();
   editor.setTool(1);
+  editor._applyToolbarPos();
   editorColsInput.value = editor.cols;
   editorRowsInput.value = editor.rows;
   requestAnimationFrame(editorLoop);
+});
+
+btnEditorToolbarPos.addEventListener('click', () => {
+  if (!editor) return;
+  const positions = ['bottom', 'left', 'top', 'right'];
+  const idx = positions.indexOf(editor.toolbarPos);
+  editor.toolbarPos = positions[(idx + 1) % 4];
+  editor._applyToolbarPos();
 });
 
 btnEditorResize.addEventListener('click', () => {
@@ -427,6 +439,7 @@ function buildEditorPalette() {
     { id: 4, name: 'Crumble',      color: '#C8A96E',  key: '\u21e7 5' },
     { id: 5, name: 'Jump-Through', color: '#E056A0',  key: '\u21e7 6' },
     { id: 6, name: 'One-Way',      color: '#8E44AD',  key: '\u21e7 7' },
+    { id: 7, name: 'Conveyor',     color: '#3498DB',  key: '\u21e7 8' },
   ];
   for (const t of types) {
     const btn = document.createElement('button');
@@ -886,6 +899,25 @@ function predictLocal(p, inp, platforms) {
       }
     }
   }
+
+  // Conveyor check
+  if (p.onGround) {
+    for (let i = 0; i < platforms.length; i++) {
+      const plat = platforms[i];
+      if (isPlatGone(plat, i)) continue;
+      if (plat.type === 'conveyor' &&
+          p.x + PLAYER_WIDTH > plat.x && p.x < plat.x + plat.w &&
+          Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
+        const dir = plat.pushDir || 0;
+        if (dir === 0) p.vx += CONVEYOR_SPEED;
+        else if (dir === 1) p.vy += CONVEYOR_SPEED;
+        else if (dir === 2) p.vx -= CONVEYOR_SPEED;
+        else if (dir === 3) p.vy -= CONVEYOR_SPEED;
+        break;
+      }
+    }
+  }
+
   const speed = MOVE_SPEED * speedMul * (p.isIt ? IT_SPEED_BOOST : 1);
 
   if (p.dashTicks <= 0) {
@@ -939,13 +971,32 @@ function predictLocal(p, inp, platforms) {
   if (onWall && p.vy > 0 && p.dashTicks <= 0) p.vy = Math.min(p.vy, WALL_SLIDE_SPEED);
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
-  // Move X
+  // Move X (with wall trampoline handling)
   p.x += p.vx;
   for (let i = 0; i < platforms.length; i++) {
     const plat = platforms[i];
     if (isPlatGone(plat, i)) continue;
     if (PASSTHROUGH_TYPES.has(plat.type)) continue;
     if (overlaps(p, plat)) {
+      // Wall trampoline bounce
+      if (plat.type === 'trampoline') {
+        const bd = plat.bounceDir;
+        if (bd === 1) {
+          // Right-side strip, bounces player left
+          p.x = plat.x - PLAYER_WIDTH;
+          p.vx = TRAMPOLINE_FORCE; // -14, pushes left
+          p.vy = 0;
+          p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+          return;
+        } else if (bd === 3) {
+          // Left-side strip, bounces player right
+          p.x = plat.x + plat.w;
+          p.vx = -TRAMPOLINE_FORCE; // +14, pushes right
+          p.vy = 0;
+          p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+          return;
+        }
+      }
       if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (p.vx < 0) p.x = plat.x + plat.w;
       p.vx = 0;
@@ -969,7 +1020,14 @@ function predictLocal(p, inp, platforms) {
           }
           p.y = plat.y - PLAYER_HEIGHT;
           if (plat.type === 'trampoline') {
-            p.vy = TRAMPOLINE_FORCE;
+            const bd = plat.bounceDir;
+            if (bd === undefined || bd === 0) {
+              p.vy = TRAMPOLINE_FORCE;
+            } else if (bd === 2) {
+              p.vy = TRAMPOLINE_FORCE;
+            } else {
+              p.vy = TRAMPOLINE_FORCE;
+            }
             p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
             return;
           }
@@ -979,6 +1037,13 @@ function predictLocal(p, inp, platforms) {
           p.onGround = true;
         } else {
           if (PASSTHROUGH_TYPES.has(plat.type)) continue;
+          // Ceiling trampoline
+          if (plat.type === 'trampoline' && plat.bounceDir === 2) {
+            p.y = plat.y + plat.h;
+            p.vy = -TRAMPOLINE_FORCE;
+            p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+            return;
+          }
           p.y = plat.y + plat.h;
         }
         p.vy = 0;

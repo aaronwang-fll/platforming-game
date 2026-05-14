@@ -32,6 +32,9 @@ export const TRAMPOLINE_FORCE = -14;
 // Speed pad — actual velocity boost while standing on it
 export const SPEED_PAD_MULTIPLIER = 2.2;
 
+// Conveyor belt
+export const CONVEYOR_SPEED = 3;
+
 // Crumble blocks
 export const CRUMBLE_DELAY = 12;
 export const CRUMBLE_GONE_TIME = 180;

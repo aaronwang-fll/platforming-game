@@ -10,6 +10,7 @@ const COL_SPEED = '#E67E22';
 const COL_CRUMBLE = '#C8A96E';
 const COL_JUMPTHROUGH = '#E056A0';
 const COL_ONEWAY = '#8E44AD';
+const COL_CONVEYOR = '#3498DB';
 
 export class Renderer {
   constructor(canvas) {
@@ -89,6 +90,31 @@ export class Renderer {
         ctx.fillStyle = COL_TRAMPOLINE;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         randomDots(ctx, p, 'rgba(255,255,255,0.18)');
+        continue;
+      }
+
+      // --- Conveyor ---
+      if (p.type === 'conveyor') {
+        ctx.fillStyle = COL_CONVEYOR;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+        randomDots(ctx, p, 'rgba(255,255,255,0.12)');
+        // Draw arrow showing push direction
+        const cx = p.x + p.w / 2;
+        const cy = p.y + p.h / 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        const dir = p.pushDir || 0;
+        if (dir === 0) { // right
+          ctx.moveTo(cx + 8, cy); ctx.lineTo(cx - 4, cy - 6); ctx.lineTo(cx - 4, cy + 6);
+        } else if (dir === 1) { // down
+          ctx.moveTo(cx, cy + 8); ctx.lineTo(cx - 6, cy - 4); ctx.lineTo(cx + 6, cy - 4);
+        } else if (dir === 2) { // left
+          ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 4, cy - 6); ctx.lineTo(cx + 4, cy + 6);
+        } else { // up
+          ctx.moveTo(cx, cy - 8); ctx.lineTo(cx - 6, cy + 4); ctx.lineTo(cx + 6, cy + 4);
+        }
+        ctx.closePath();
+        ctx.fill();
         continue;
       }
 
@@ -308,7 +334,7 @@ export class Renderer {
 
   drawInstructions() {
     const ctx = this.ctx;
-    const w = 420, h = 420;
+    const w = 420, h = 440;
     const x = (CANVAS_WIDTH - w) / 2;
     const y = (CANVAS_HEIGHT - h) / 2;
 
@@ -346,11 +372,12 @@ export class Renderer {
     ly += 18;
     const blocks = [
       [COL_NORMAL, 'Platform', 'Solid ground'],
-      [COL_TRAMPOLINE, 'Trampoline', 'Bounces you high'],
+      [COL_TRAMPOLINE, 'Trampoline', 'Bounces you (rotatable)'],
       [COL_SPEED, 'Speed Pad', '2x speed + dash refill'],
       [COL_CRUMBLE, 'Crumble', 'Breaks when stepped on'],
       [COL_JUMPTHROUGH, 'Jump-Through', 'Pass up through it'],
       [COL_ONEWAY, 'One-Way', 'Land on top only'],
+      [COL_CONVEYOR, 'Conveyor', 'Pushes you (rotatable)'],
     ];
     for (const [c, n, d] of blocks) {
       ctx.fillStyle = c;
