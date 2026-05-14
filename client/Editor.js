@@ -376,10 +376,11 @@ export class Editor {
         if (SOLID_TYPES.has(below) && here === 0) {
           const above = r >= 2 ? (this.grid[r - 2]?.[c] || 0) : 0;
           if (above === 0) {
-            spots.push({
-              x: c * CELL - offX + (CELL - PLAYER_WIDTH) / 2,
-              y: r * CELL - offY - PLAYER_HEIGHT,
-            });
+            const sx = c * CELL - offX + (CELL - PLAYER_WIDTH) / 2;
+            // Ensure spawn is past the 20px boundary walls
+            if (sx >= 22 && sx + PLAYER_WIDTH <= mapW - 22) {
+              spots.push({ x: sx, y: r * CELL - offY - PLAYER_HEIGHT });
+            }
             break;
           }
         }
@@ -390,7 +391,7 @@ export class Editor {
     if (spots.length === 0) {
       for (let i = 0; i < count; i++) {
         spots.push({
-          x: 40 + (mapW - 80) * (i / Math.max(1, count - 1)),
+          x: 24 + (mapW - 48) * (i / Math.max(1, count - 1)),
           y: mapH - CELL - PLAYER_HEIGHT,
         });
       }
