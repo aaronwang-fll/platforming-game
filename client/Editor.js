@@ -147,11 +147,16 @@ export class Editor {
 
   _handleKeyDown(e) {
     if (this.testing) return;
+    // Don't intercept when typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     this.keysDown[e.code] = true;
-    const digit = parseInt(e.key);
-    if (digit >= 1 && digit <= 7) {
-      this.setTool(digit - 1);
-      e.preventDefault();
+    // Shift+1-7 to select tools
+    if (e.shiftKey) {
+      const digit = parseInt(e.key);
+      if (digit >= 1 && digit <= 7) {
+        this.setTool(digit - 1);
+        e.preventDefault();
+      }
     }
   }
 

@@ -420,13 +420,13 @@ btnEditorResize.addEventListener('click', () => {
 function buildEditorPalette() {
   editorToolsEl.innerHTML = '';
   const types = [
-    { id: 0, name: 'Eraser',       color: '#bbb',    key: '1' },
-    { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '2' },
-    { id: 2, name: 'Trampoline',   color: '#27AE60',  key: '3' },
-    { id: 3, name: 'Speed Pad',    color: '#E67E22',  key: '4' },
-    { id: 4, name: 'Crumble',      color: '#C8A96E',  key: '5' },
-    { id: 5, name: 'Jump-Through', color: '#E056A0',  key: '6' },
-    { id: 6, name: 'One-Way',      color: '#8E44AD',  key: '7' },
+    { id: 0, name: 'Eraser',       color: '#bbb',    key: '\u21e7 1' },
+    { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '\u21e7 2' },
+    { id: 2, name: 'Trampoline',   color: '#27AE60',  key: '\u21e7 3' },
+    { id: 3, name: 'Speed Pad',    color: '#E67E22',  key: '\u21e7 4' },
+    { id: 4, name: 'Crumble',      color: '#C8A96E',  key: '\u21e7 5' },
+    { id: 5, name: 'Jump-Through', color: '#E056A0',  key: '\u21e7 6' },
+    { id: 6, name: 'One-Way',      color: '#8E44AD',  key: '\u21e7 7' },
   ];
   for (const t of types) {
     const btn = document.createElement('button');
