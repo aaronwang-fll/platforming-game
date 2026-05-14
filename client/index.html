@@ -84,6 +84,11 @@
     <div id="editor-toolbar">
       <div id="editor-tools"></div>
       <div id="editor-actions">
+        <div class="editor-size-row">
+          <label>W<input type="number" id="editor-cols" min="20" max="100" value="62" class="editor-size-input"></label>
+          <label>H<input type="number" id="editor-rows" min="15" max="60" value="37" class="editor-size-input"></label>
+          <button class="editor-btn" id="btn-editor-resize">Resize</button>
+        </div>
         <button class="editor-btn" id="btn-editor-test">Test</button>
         <button class="editor-btn" id="btn-editor-stop" style="display:none">Stop</button>
         <button class="editor-btn" id="btn-editor-save">Save Code</button>

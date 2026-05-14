@@ -390,6 +390,9 @@ const btnEditorSave = document.getElementById('btn-editor-save');
 const btnEditorLoad = document.getElementById('btn-editor-load');
 const btnEditorClear = document.getElementById('btn-editor-clear');
 const btnEditorExit = document.getElementById('btn-editor-exit');
+const btnEditorResize = document.getElementById('btn-editor-resize');
+const editorColsInput = document.getElementById('editor-cols');
+const editorRowsInput = document.getElementById('editor-rows');
 
 document.getElementById('btn-editor').addEventListener('click', () => {
   editorMode = true;
@@ -400,7 +403,18 @@ document.getElementById('btn-editor').addEventListener('click', () => {
   btnEndGame.style.display = 'none';
   buildEditorPalette();
   editor.setTool(1);
+  editorColsInput.value = editor.cols;
+  editorRowsInput.value = editor.rows;
   requestAnimationFrame(editorLoop);
+});
+
+btnEditorResize.addEventListener('click', () => {
+  if (!editor) return;
+  const newCols = parseInt(editorColsInput.value) || editor.cols;
+  const newRows = parseInt(editorRowsInput.value) || editor.rows;
+  editor.resize(newCols, newRows);
+  editorColsInput.value = editor.cols;
+  editorRowsInput.value = editor.rows;
 });
 
 function buildEditorPalette() {
@@ -565,6 +579,7 @@ btnEditorLoad.addEventListener('click', () => {
     if (code) {
       const ok = editor.load(code);
       if (!ok) alert('Invalid level code.');
+      else { editorColsInput.value = editor.cols; editorRowsInput.value = editor.rows; }
     }
     editorCodeEl.style.display = 'none';
     editorCodeVisible = false;

@@ -3,6 +3,10 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT } from '/share
 const CELL = 32;
 const DEFAULT_COLS = 62;
 const DEFAULT_ROWS = 37;
+const MIN_COLS = 20;  // 640px
+const MIN_ROWS = 15;  // 480px
+const MAX_COLS = 100; // 3200px
+const MAX_ROWS = 60;  // 1920px
 
 // Block types: 0=empty, 1=solid, 2=trampoline, 3=dash_block, 4=crumble, 5=jumpthrough, 6=oneway
 const BLOCK_TYPES = [
@@ -24,18 +28,16 @@ export class Editor {
     this.cols = DEFAULT_COLS;
     this.rows = DEFAULT_ROWS;
     this.grid = this.makeGrid();
-    this.tool = 1; // solid by default
+    this.tool = 1;
     this.camX = 0;
     this.camY = 0;
     this.mouseX = -1;
     this.mouseY = -1;
     this.painting = false;
     this.erasing = false;
+    this._paintingAs = 0;
     this.keysDown = {};
     this.testing = false;
-
-    // Compute canvas scale factor for mouse mapping
-    this._canvasRect = null;
 
     this._onMouseDown = this._handleMouseDown.bind(this);
     this._onMouseMove = this._handleMouseMove.bind(this);
@@ -61,6 +63,37 @@ export class Editor {
     return grid;
   }
 
+  // Resize grid, preserving existing content
+  resize(newCols, newRows) {
+    newCols = Math.max(MIN_COLS, Math.min(MAX_COLS, newCols));
+    newRows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, newRows));
+    if (newCols === this.cols && newRows === this.rows) return;
+
+    const oldGrid = this.grid;
+    const oldCols = this.cols;
+    const oldRows = this.rows;
+    this.cols = newCols;
+    this.rows = newRows;
+    this.grid = this.makeGrid();
+
+    // Copy existing data
+    const copyRows = Math.min(oldRows, newRows);
+    const copyCols = Math.min(oldCols, newCols);
+    for (let r = 0; r < copyRows; r++) {
+      for (let c = 0; c < copyCols; c++) {
+        this.grid[r][c] = oldGrid[r][c];
+      }
+    }
+
+    // Clamp camera
+    this._clampCamera();
+  }
+
+  get minCols() { return MIN_COLS; }
+  get maxCols() { return MAX_COLS; }
+  get minRows() { return MIN_ROWS; }
+  get maxRows() { return MAX_ROWS; }
+
   _getCanvasScale() {
     const rect = this.canvas.getBoundingClientRect();
     return {
@@ -75,9 +108,7 @@ export class Editor {
     const s = this._getCanvasScale();
     const cx = (clientX - s.left) * s.scaleX + this.camX;
     const cy = (clientY - s.top) * s.scaleY + this.camY;
-    const col = Math.floor(cx / CELL);
-    const row = Math.floor(cy / CELL);
-    return { col, row };
+    return { col: Math.floor(cx / CELL), row: Math.floor(cy / CELL) };
   }
 
   _handleMouseDown(e) {
@@ -87,7 +118,6 @@ export class Editor {
       this.erasing = true;
       this._paintCell(col, row, 0);
     } else if (e.button === 0) {
-      // Toggle: if cell already has this type, erase it
       if (col >= 0 && col < this.cols && row >= 0 && row < this.rows && this.grid[row][col] === this.tool) {
         this.painting = true;
         this._paintingAs = 0;
@@ -104,14 +134,13 @@ export class Editor {
     const s = this._getCanvasScale();
     this.mouseX = (e.clientX - s.left) * s.scaleX;
     this.mouseY = (e.clientY - s.top) * s.scaleY;
-
     if (this.testing) return;
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
     if (this.painting) this._paintCell(col, row, this._paintingAs);
     if (this.erasing) this._paintCell(col, row, 0);
   }
 
-  _handleMouseUp(e) {
+  _handleMouseUp() {
     this.painting = false;
     this.erasing = false;
   }
@@ -119,7 +148,6 @@ export class Editor {
   _handleKeyDown(e) {
     if (this.testing) return;
     this.keysDown[e.code] = true;
-    // Number keys 1-7 to select tool
     const digit = parseInt(e.key);
     if (digit >= 1 && digit <= 7) {
       this.setTool(digit - 1);
@@ -138,11 +166,15 @@ export class Editor {
 
   setTool(type) {
     this.tool = type;
-    // Update UI highlight
     const tools = document.querySelectorAll('.editor-tool-btn');
-    tools.forEach((el, i) => {
-      el.classList.toggle('active', i === type);
-    });
+    tools.forEach((el, i) => el.classList.toggle('active', i === type));
+  }
+
+  _clampCamera() {
+    const mapW = this.cols * CELL;
+    const mapH = this.rows * CELL;
+    this.camX = Math.max(0, Math.min(this.camX, Math.max(0, mapW - CANVAS_WIDTH)));
+    this.camY = Math.max(0, Math.min(this.camY, Math.max(0, mapH - CANVAS_HEIGHT)));
   }
 
   updateCamera() {
@@ -152,11 +184,7 @@ export class Editor {
     if (this.keysDown['KeyS'] || this.keysDown['ArrowDown']) this.camY += speed;
     if (this.keysDown['KeyA'] || this.keysDown['ArrowLeft']) this.camX -= speed;
     if (this.keysDown['KeyD'] || this.keysDown['ArrowRight']) this.camX += speed;
-
-    const mapW = this.cols * CELL;
-    const mapH = this.rows * CELL;
-    this.camX = Math.max(0, Math.min(this.camX, mapW - CANVAS_WIDTH));
-    this.camY = Math.max(0, Math.min(this.camY, mapH - CANVAS_HEIGHT));
+    this._clampCamera();
   }
 
   render(ctx) {
@@ -165,7 +193,6 @@ export class Editor {
     const mapW = this.cols * CELL;
     const mapH = this.rows * CELL;
 
-    // Background
     ctx.fillStyle = '#7EC8E3';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
@@ -181,16 +208,10 @@ export class Editor {
     const endRow = Math.min(this.rows, Math.ceil((this.camY + CANVAS_HEIGHT) / CELL) + 1);
 
     for (let c = startCol; c <= endCol; c++) {
-      ctx.beginPath();
-      ctx.moveTo(c * CELL, startRow * CELL);
-      ctx.lineTo(c * CELL, endRow * CELL);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(c * CELL, startRow * CELL); ctx.lineTo(c * CELL, endRow * CELL); ctx.stroke();
     }
     for (let r = startRow; r <= endRow; r++) {
-      ctx.beginPath();
-      ctx.moveTo(startCol * CELL, r * CELL);
-      ctx.lineTo(endCol * CELL, r * CELL);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(startCol * CELL, r * CELL); ctx.lineTo(endCol * CELL, r * CELL); ctx.stroke();
     }
 
     // Filled cells
@@ -203,59 +224,18 @@ export class Editor {
         const y = r * CELL;
 
         if (type === 2) {
-          // Trampoline: draw thin strip at bottom of cell
           ctx.fillStyle = block.color;
           ctx.fillRect(x, y + CELL - 12, CELL, 12);
-          ctx.fillStyle = 'rgba(255,255,255,0.15)';
-          for (let dx = x + 4; dx < x + CELL; dx += 8) {
-            ctx.fillRect(dx, y + CELL - 8, 3, 3);
-          }
+        } else if (type === 5 || type === 6) {
+          // Jumpthrough / oneway — semi-transparent with solid top
+          ctx.fillStyle = block.color;
+          ctx.globalAlpha = 0.5;
+          ctx.fillRect(x, y, CELL, CELL);
+          ctx.globalAlpha = 1;
+          ctx.fillRect(x, y, CELL, 3);
         } else {
           ctx.fillStyle = block.color;
           ctx.fillRect(x, y, CELL, CELL);
-
-          // Type-specific textures (matching Renderer.js)
-          if (type === 1) {
-            // Solid - brick-like
-            ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(x + 16, y); ctx.lineTo(x + 16, y + CELL); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(x, y + 16); ctx.lineTo(x + CELL, y + 16); ctx.stroke();
-            ctx.fillStyle = '#4D3D3D';
-            ctx.fillRect(x, y, CELL, 2);
-          } else if (type === 3) {
-            // Speed pad
-            ctx.fillStyle = 'rgba(255,255,255,0.12)';
-            for (let dy2 = y + 5; dy2 < y + CELL - 2; dy2 += 8) {
-              for (let dx2 = x + 6; dx2 < x + CELL; dx2 += 12) {
-                ctx.fillRect(dx2, dy2, 3, 3);
-              }
-            }
-            ctx.fillStyle = '#F0A04B';
-            ctx.fillRect(x, y, CELL, 2);
-          } else if (type === 4) {
-            // Crumble
-            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-            ctx.lineWidth = 1;
-            ctx.beginPath(); ctx.moveTo(x + 8, y); ctx.lineTo(x, y + CELL); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(x + 24, y); ctx.lineTo(x + 16, y + CELL); ctx.stroke();
-          } else if (type === 5) {
-            // Jump-through
-            ctx.globalAlpha = 0.45;
-            ctx.fillStyle = block.color;
-            ctx.fillRect(x, y, CELL, CELL);
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = block.color;
-            ctx.fillRect(x, y, CELL, 3);
-          } else if (type === 6) {
-            // One-way
-            ctx.globalAlpha = 0.45;
-            ctx.fillStyle = block.color;
-            ctx.fillRect(x, y, CELL, CELL);
-            ctx.globalAlpha = 1;
-            ctx.fillStyle = block.color;
-            ctx.fillRect(x, y, CELL, 3);
-          }
         }
       }
     }
@@ -270,9 +250,9 @@ export class Editor {
       const hCol = Math.floor((this.mouseX + this.camX) / CELL);
       const hRow = Math.floor((this.mouseY + this.camY) / CELL);
       if (hCol >= 0 && hCol < this.cols && hRow >= 0 && hRow < this.rows) {
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
         ctx.fillRect(hCol * CELL, hRow * CELL, CELL, CELL);
-        ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.lineWidth = 2;
         ctx.strokeRect(hCol * CELL, hRow * CELL, CELL, CELL);
       }
@@ -287,6 +267,8 @@ export class Editor {
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('LEVEL EDITOR', 20, 23);
+    ctx.textAlign = 'center';
+    ctx.fillText(`${this.cols}x${this.rows}`, CANVAS_WIDTH / 2, 23);
     ctx.textAlign = 'right';
     const block = BLOCK_TYPES[this.tool];
     ctx.fillText(`Tool: ${block.name} [${block.key}]`, CANVAS_WIDTH - 20, 23);
@@ -298,13 +280,11 @@ export class Editor {
     const mapH = this.rows * CELL;
     const platforms = [];
 
-    // Boundary walls
-    platforms.push({ x: 0, y: 0, w: 20, h: mapH }); // left
-    platforms.push({ x: mapW - 20, y: 0, w: 20, h: mapH }); // right
-    // Floor
-    platforms.push({ x: 0, y: mapH - 32, w: mapW, h: 32 });
+    // Boundary walls only — no auto floor
+    platforms.push({ x: 0, y: 0, w: 20, h: mapH });
+    platforms.push({ x: mapW - 20, y: 0, w: 20, h: mapH });
 
-    // Merge adjacent same-type horizontal cells
+    // Merge adjacent same-type horizontal cells into platforms
     for (let r = 0; r < this.rows; r++) {
       let c = 0;
       while (c < this.cols) {
@@ -312,12 +292,9 @@ export class Editor {
         if (type === 0) { c++; continue; }
 
         if (type === 2) {
-          // Trampolines: 2 cells wide, thin strip
-          // Scan for consecutive trampoline cells
           let startC = c;
           while (c < this.cols && this.grid[r][c] === 2) c++;
           const cellCount = c - startC;
-          // Create trampolines in pairs of 2 (64px wide)
           for (let i = 0; i < cellCount; i += 2) {
             const tw = Math.min(2, cellCount - i) * CELL;
             platforms.push({
@@ -330,7 +307,6 @@ export class Editor {
           continue;
         }
 
-        // Other types: merge horizontally
         const startC = c;
         while (c < this.cols && this.grid[r][c] === type) c++;
         const plat = {
@@ -345,14 +321,8 @@ export class Editor {
       }
     }
 
-    // Spawn points: 8 evenly spaced along the floor
-    const spawns = [];
-    for (let i = 0; i < 8; i++) {
-      spawns.push({
-        x: 40 + (mapW - 80) * (i / 7),
-        y: mapH - 32 - PLAYER_HEIGHT - 2,
-      });
-    }
+    // Find spawn points — scan columns from left, find open air above solid ground
+    const spawns = this._findSpawns(8);
 
     return {
       name: 'Custom',
@@ -365,12 +335,49 @@ export class Editor {
     };
   }
 
+  // Scan the grid to find safe spawn positions
+  // Looks for empty cells with a solid block below (any non-empty, non-trampoline)
+  _findSpawns(count) {
+    const spots = [];
+
+    // Scan each column from left to right
+    for (let c = 1; c < this.cols - 1; c++) {
+      // Scan from top to bottom — find first solid cell, spawn is above it
+      for (let r = 1; r < this.rows; r++) {
+        const cellBelow = this.grid[r][c];
+        const cellHere = this.grid[r - 1][c];
+        // Need: solid-ish block below, empty above, and one more empty above for player height
+        if (cellBelow >= 1 && cellBelow !== 2 && cellHere === 0) {
+          const cellAbove = r >= 2 ? this.grid[r - 2][c] : 0;
+          if (cellAbove === 0) {
+            spots.push({
+              x: c * CELL + (CELL - PLAYER_WIDTH) / 2,
+              y: r * CELL - PLAYER_HEIGHT - 1,
+              col: c,
+            });
+            break; // one spot per column
+          }
+        }
+      }
+    }
+
+    if (spots.length === 0) {
+      // Fallback: center of map, near top
+      return [{ x: (this.cols * CELL) / 2, y: CELL * 2 }];
+    }
+
+    // Pick `count` evenly spaced from the spots found
+    const result = [];
+    for (let i = 0; i < count; i++) {
+      const idx = Math.floor(i * spots.length / count);
+      result.push({ x: spots[idx].x, y: spots[idx].y });
+    }
+    return result;
+  }
+
   save() {
-    // Encode: header "COLSxROWS;" then each row as COLS chars (0-6), rows joined by |
-    // Then base64 encode the whole thing
     let rowStrs = [];
     for (let r = 0; r < this.rows; r++) {
-      // RLE within each row
       let rowStr = '';
       let c = 0;
       while (c < this.cols) {
@@ -386,10 +393,10 @@ export class Editor {
       }
       rowStrs.push(rowStr);
     }
-    // Trim trailing empty rows
-    while (rowStrs.length > 0 && /^(0+|(\d+0)+)$/.test(rowStrs[rowStrs.length - 1]) && rowStrs[rowStrs.length - 1].replace(/\d+/g, m => '0'.repeat(parseInt(m) || 1)).replace(/0/g, '') === '') {
-      // Check if row is all zeros
+    // Trim trailing all-zero rows
+    while (rowStrs.length > 0) {
       const last = rowStrs[rowStrs.length - 1];
+      // Check if row is all zeros by parsing the RLE
       let allZero = true;
       let i = 0;
       while (i < last.length) {
@@ -412,8 +419,8 @@ export class Editor {
       const raw = atob(code.trim());
       const [header, body] = raw.split(';');
       const [colsStr, rowsStr] = header.split('x');
-      this.cols = parseInt(colsStr);
-      this.rows = parseInt(rowsStr);
+      this.cols = Math.max(MIN_COLS, Math.min(MAX_COLS, parseInt(colsStr)));
+      this.rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, parseInt(rowsStr)));
       this.grid = this.makeGrid();
 
       if (!body) return true;
@@ -423,10 +430,8 @@ export class Editor {
         let c = 0;
         let i = 0;
         while (i < rle.length && c < this.cols) {
-          // Parse optional run count
           let numStr = '';
           while (i < rle.length && rle[i] >= '1' && rle[i] <= '9' && (numStr + rle[i]).length < 4) {
-            // Only treat as count if followed by a digit 0-6
             numStr += rle[i];
             i++;
           }
@@ -443,6 +448,7 @@ export class Editor {
           }
         }
       }
+      this._clampCamera();
       return true;
     } catch (e) {
       console.error('Failed to load level code:', e);
