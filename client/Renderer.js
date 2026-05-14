@@ -88,11 +88,7 @@ export class Renderer {
       if (p.type === 'trampoline') {
         ctx.fillStyle = COL_TRAMPOLINE;
         ctx.fillRect(p.x, p.y, p.w, p.h);
-        // Subtle dots
-        ctx.fillStyle = 'rgba(255,255,255,0.15)';
-        for (let dx = p.x + 6; dx < p.x + p.w; dx += 10) {
-          ctx.fillRect(dx, p.y + 4, 3, 3);
-        }
+        randomDots(ctx, p, 'rgba(255,255,255,0.18)');
         continue;
       }
 
@@ -100,16 +96,7 @@ export class Renderer {
       if (p.type === 'dash_block') {
         ctx.fillStyle = COL_SPEED;
         ctx.fillRect(p.x, p.y, p.w, p.h);
-        // Subtle dots texture
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        for (let dy = p.y + 5; dy < p.y + p.h - 2; dy += 8) {
-          for (let dx = p.x + 6; dx < p.x + p.w; dx += 12) {
-            ctx.fillRect(dx, dy, 3, 3);
-          }
-        }
-        // Lighter top edge
-        ctx.fillStyle = '#F0A04B';
-        ctx.fillRect(p.x, p.y, p.w, 2);
+        randomDots(ctx, p, 'rgba(255,255,255,0.15)');
         continue;
       }
 
@@ -131,18 +118,9 @@ export class Renderer {
         const sx = isShaking ? (Math.random() - 0.5) * 3 : 0;
         const sy = isShaking ? (Math.random() - 0.5) * 2 : 0;
         ctx.globalAlpha = isShaking ? 0.6 : 1;
-
         ctx.fillStyle = COL_CRUMBLE;
         ctx.fillRect(p.x + sx, p.y + sy, p.w, p.h);
-        // Diagonal line texture
-        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
-        ctx.lineWidth = 1;
-        for (let lx = p.x + sx + 8; lx < p.x + sx + p.w; lx += 16) {
-          ctx.beginPath();
-          ctx.moveTo(lx, p.y + sy);
-          ctx.lineTo(lx - 8, p.y + sy + p.h);
-          ctx.stroke();
-        }
+        randomDots(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h }, 'rgba(255,255,255,0.14)');
         ctx.globalAlpha = 1;
         continue;
       }
@@ -150,56 +128,30 @@ export class Renderer {
       // --- Jump-Through ---
       if (p.type === 'jumpthrough') {
         ctx.fillStyle = COL_JUMPTHROUGH;
-        ctx.globalAlpha = 0.45;
+        ctx.globalAlpha = 0.5;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         ctx.globalAlpha = 1;
-        // Solid top line
         ctx.fillStyle = COL_JUMPTHROUGH;
         ctx.fillRect(p.x, p.y, p.w, 3);
-        // Small dots
-        ctx.fillStyle = 'rgba(224,86,160,0.2)';
-        for (let dy = p.y + 8; dy < p.y + p.h - 2; dy += 8) {
-          for (let dx = p.x + 6; dx < p.x + p.w; dx += 10) {
-            ctx.fillRect(dx, dy, 3, 3);
-          }
-        }
+        randomDots(ctx, p, 'rgba(255,255,255,0.12)');
         continue;
       }
 
       // --- One-Way ---
       if (p.type === 'oneway') {
         ctx.fillStyle = COL_ONEWAY;
-        ctx.globalAlpha = 0.45;
+        ctx.globalAlpha = 0.5;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         ctx.globalAlpha = 1;
-        // Solid top line
         ctx.fillStyle = COL_ONEWAY;
         ctx.fillRect(p.x, p.y, p.w, 3);
-        // Small dots
-        ctx.fillStyle = 'rgba(142,68,173,0.2)';
-        for (let dy = p.y + 8; dy < p.y + p.h - 2; dy += 8) {
-          for (let dx = p.x + 6; dx < p.x + p.w; dx += 10) {
-            ctx.fillRect(dx, dy, 3, 3);
-          }
-        }
+        randomDots(ctx, p, 'rgba(255,255,255,0.12)');
         continue;
       }
 
-      // --- Normal Platform ---
+      // --- Normal Platform — no texture, just solid color ---
       ctx.fillStyle = COL_NORMAL;
       ctx.fillRect(p.x, p.y, p.w, p.h);
-      // Brick-like grid texture
-      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-      ctx.lineWidth = 1;
-      for (let lx = p.x + 16; lx < p.x + p.w; lx += 16) {
-        ctx.beginPath(); ctx.moveTo(lx, p.y); ctx.lineTo(lx, p.y + p.h); ctx.stroke();
-      }
-      if (p.h > 20) {
-        ctx.beginPath(); ctx.moveTo(p.x, p.y + 16); ctx.lineTo(p.x + p.w, p.y + 16); ctx.stroke();
-      }
-      // Top edge
-      ctx.fillStyle = '#4D3D3D';
-      ctx.fillRect(p.x, p.y, p.w, 2);
     }
   }
 
@@ -416,5 +368,21 @@ export class Renderer {
     ctx.textAlign = 'center';
     ctx.fillText('Press H or click to close', CANVAS_WIDTH / 2, ly);
     ctx.textAlign = 'left';
+  }
+}
+
+// Seeded pseudo-random dots for block textures — deterministic per position, packed & random-looking
+function randomDots(ctx, p, color) {
+  ctx.fillStyle = color;
+  // Use position as seed for deterministic randomness
+  const seed = (p.x * 7 + p.y * 13) | 0;
+  let s = seed;
+  const nextRand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return (s >> 16) / 32768; };
+  const area = p.w * p.h;
+  const count = Math.max(4, Math.floor(area / 28));
+  for (let i = 0; i < count; i++) {
+    const dx = p.x + 2 + nextRand() * (p.w - 4);
+    const dy = p.y + 2 + nextRand() * (p.h - 4);
+    ctx.fillRect(Math.floor(dx), Math.floor(dy), 2, 2);
   }
 }

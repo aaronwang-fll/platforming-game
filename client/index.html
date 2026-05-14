@@ -21,6 +21,7 @@
     <div class="lobby-bottom-row">
       <button class="btn-secondary" id="btn-help">How to Play</button>
       <button class="btn-secondary" id="btn-settings">Settings</button>
+      <button class="btn-secondary" id="btn-editor">Editor</button>
       <button class="btn-secondary" id="btn-newwindow">Open in New Tab</button>
     </div>
 
@@ -77,6 +78,22 @@
   </div>
 
   <canvas id="game"></canvas>
+
+  <!-- Editor UI -->
+  <div id="editor-ui" style="display:none;">
+    <div id="editor-toolbar">
+      <div id="editor-tools"></div>
+      <div id="editor-actions">
+        <button class="editor-btn" id="btn-editor-test">Test</button>
+        <button class="editor-btn" id="btn-editor-stop" style="display:none">Stop</button>
+        <button class="editor-btn" id="btn-editor-save">Save Code</button>
+        <button class="editor-btn" id="btn-editor-load">Load Code</button>
+        <button class="editor-btn" id="btn-editor-clear">Clear</button>
+        <button class="editor-btn editor-btn-exit" id="btn-editor-exit">Exit</button>
+      </div>
+    </div>
+    <textarea id="editor-code" placeholder="Paste level code here..." style="display:none;"></textarea>
+  </div>
 
   <!-- In-game overlay buttons -->
   <button id="btn-quit" class="game-overlay-btn quit-btn" style="display:none;">Quit</button>

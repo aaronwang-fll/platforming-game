@@ -3,6 +3,7 @@ import { Renderer } from '/client/Renderer.js';
 import { Camera } from '/client/Camera.js';
 import { NetClient } from '/client/NetClient.js';
 import { Interpolation } from '/client/Interpolation.js';
+import { Editor } from '/client/Editor.js';
 import {
   GRAVITY, MOVE_SPEED, JUMP_FORCE, MAX_FALL_SPEED,
   PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_COLORS, IT_SPEED_BOOST,
@@ -58,6 +59,10 @@ let lastInput = { left: false, right: false, jump: false, dash: false };
 const effects = [];
 let showInstructions = false;
 let crumbleState = new Map();
+
+// Editor mode
+let editorMode = false;
+let editor = null;
 
 // Double jump option (practice mode)
 let doubleJumpEnabled = localStorage.getItem('tag_doublejump') !== 'false';
@@ -373,6 +378,225 @@ btnPractice.addEventListener('click', () => {
   accumulator = 0;
   showScreen('game');
   requestAnimationFrame(gameLoop);
+});
+
+// --- Editor mode ---
+const editorUI = document.getElementById('editor-ui');
+const editorToolsEl = document.getElementById('editor-tools');
+const editorCodeEl = document.getElementById('editor-code');
+const btnEditorTest = document.getElementById('btn-editor-test');
+const btnEditorStop = document.getElementById('btn-editor-stop');
+const btnEditorSave = document.getElementById('btn-editor-save');
+const btnEditorLoad = document.getElementById('btn-editor-load');
+const btnEditorClear = document.getElementById('btn-editor-clear');
+const btnEditorExit = document.getElementById('btn-editor-exit');
+
+document.getElementById('btn-editor').addEventListener('click', () => {
+  editorMode = true;
+  editor = new Editor(canvas);
+  showScreen('game');
+  editorUI.style.display = 'block';
+  btnQuit.style.display = 'none';
+  btnEndGame.style.display = 'none';
+  buildEditorPalette();
+  editor.setTool(1);
+  requestAnimationFrame(editorLoop);
+});
+
+function buildEditorPalette() {
+  editorToolsEl.innerHTML = '';
+  const types = [
+    { id: 0, name: 'Eraser',       color: '#bbb',    key: '1' },
+    { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '2' },
+    { id: 2, name: 'Trampoline',   color: '#27AE60',  key: '3' },
+    { id: 3, name: 'Speed Pad',    color: '#E67E22',  key: '4' },
+    { id: 4, name: 'Crumble',      color: '#C8A96E',  key: '5' },
+    { id: 5, name: 'Jump-Through', color: '#E056A0',  key: '6' },
+    { id: 6, name: 'One-Way',      color: '#8E44AD',  key: '7' },
+  ];
+  for (const t of types) {
+    const btn = document.createElement('button');
+    btn.className = 'editor-tool-btn' + (t.id === 1 ? ' active' : '');
+    btn.innerHTML = `<span class="editor-tool-swatch" style="background:${t.color}"></span>${t.name}<span class="editor-tool-key">${t.key}</span>`;
+    btn.addEventListener('click', () => editor.setTool(t.id));
+    editorToolsEl.appendChild(btn);
+  }
+}
+
+let editorTestPlayer = null;
+let editorTestMap = null;
+let editorTestPrevX = 0, editorTestPrevY = 0;
+let editorTestAccum = 0, editorTestLastTime = 0;
+const editorCamera = new Camera();
+
+function editorLoop(time) {
+  if (!editorMode) return;
+
+  if (editor.testing) {
+    // Test mode: run physics
+    const dt = editorTestLastTime ? time - editorTestLastTime : 0;
+    editorTestLastTime = time;
+    editorTestAccum = Math.min(editorTestAccum + dt, TICK_MS * 4);
+
+    while (editorTestAccum >= TICK_MS) {
+      editorTestAccum -= TICK_MS;
+      const inp = input.getState();
+
+      if (editorTestPlayer && editorTestMap) {
+        editorTestPrevX = editorTestPlayer.x;
+        editorTestPrevY = editorTestPlayer.y;
+
+        // Update crumble blocks
+        for (const plat of editorTestMap.platforms) {
+          if (plat.type !== 'crumble') continue;
+          if (plat.timer > 0) {
+            plat.timer--;
+            plat.gone = plat.timer > 0 && plat.timer <= CRUMBLE_GONE_TIME;
+          }
+        }
+
+        if (!editorTestPlayer.frozen) {
+          predictLocal(editorTestPlayer, inp, editorTestMap.platforms);
+
+          for (const plat of editorTestMap.platforms) {
+            if (plat.type !== 'crumble' || plat.timer > 0) continue;
+            if (editorTestPlayer.onGround &&
+                editorTestPlayer.x + PLAYER_WIDTH > plat.x && editorTestPlayer.x < plat.x + plat.w &&
+                Math.abs((editorTestPlayer.y + PLAYER_HEIGHT) - plat.y) < 3) {
+              plat.timer = CRUMBLE_DELAY + CRUMBLE_GONE_TIME;
+            }
+          }
+        }
+      }
+    }
+
+    // Render test mode
+    const alpha = editorTestAccum / TICK_MS;
+    let rx = 0, ry = 0;
+    if (editorTestPlayer) {
+      rx = editorTestPrevX + (editorTestPlayer.x - editorTestPrevX) * alpha;
+      ry = editorTestPrevY + (editorTestPlayer.y - editorTestPrevY) * alpha;
+    }
+
+    renderer.clear(editorTestMap.bg);
+    renderer.drawBackground(editorTestMap, editorCamera);
+    renderer.drawDecor(editorTestMap, editorCamera);
+    renderer.applyCamera(editorCamera);
+    renderer.drawPlatforms(editorTestMap.platforms, editorTestMap.theme);
+
+    if (editorTestPlayer) {
+      renderer.drawPlayer(rx, ry, selectedColor,
+        nameInput.value || 'You', editorTestPlayer.facingRight, false, false,
+        editorTestPlayer.dashCharge, editorTestPlayer.dashTicks > 0, editorTestPlayer.vy);
+    }
+
+    renderer.resetCamera();
+
+    if (editorTestPlayer) {
+      editorCamera.follow(rx + PLAYER_WIDTH / 2, ry + PLAYER_HEIGHT / 2,
+        editorTestMap.width, editorTestMap.height);
+    }
+
+    renderer.drawHUD('editor test', null, false, 1);
+  } else {
+    // Editor render mode
+    editor.render(renderer.ctx);
+  }
+
+  requestAnimationFrame(editorLoop);
+}
+
+btnEditorTest.addEventListener('click', () => {
+  if (!editor) return;
+  editor.testing = true;
+  editorTestMap = editor.toMap();
+  // Reset crumble states
+  for (const p of editorTestMap.platforms) {
+    if (p.type === 'crumble') { p.timer = 0; p.gone = false; }
+  }
+  const spawn = editorTestMap.spawns ? editorTestMap.spawns[0] : { x: 100, y: 100 };
+  editorTestPlayer = {
+    x: spawn.x, y: spawn.y,
+    vx: 0, vy: 0,
+    onGround: false, facingRight: true,
+    jumpHeld: false, dashHeld: false,
+    isIt: false, frozen: false,
+    hasDoubleJump: doubleJumpEnabled,
+    dashCharge: 1, dashTicks: 0,
+  };
+  editorTestLastTime = 0;
+  editorTestAccum = 0;
+  editorCamera.x = 0;
+  editorCamera.y = 0;
+  btnEditorTest.style.display = 'none';
+  btnEditorStop.style.display = '';
+  // Hide tool palette during test
+  editorToolsEl.style.display = 'none';
+});
+
+btnEditorStop.addEventListener('click', () => {
+  if (!editor) return;
+  editor.testing = false;
+  editorTestPlayer = null;
+  editorTestMap = null;
+  btnEditorTest.style.display = '';
+  btnEditorStop.style.display = 'none';
+  editorToolsEl.style.display = '';
+});
+
+let editorCodeVisible = false;
+let editorCodeMode = null; // 'save' or 'load'
+
+btnEditorSave.addEventListener('click', () => {
+  if (!editor) return;
+  const code = editor.save();
+  editorCodeEl.value = code;
+  editorCodeEl.style.display = 'block';
+  editorCodeEl.select();
+  editorCodeMode = 'save';
+  editorCodeVisible = true;
+});
+
+btnEditorLoad.addEventListener('click', () => {
+  if (!editor) return;
+  if (editorCodeVisible && editorCodeMode === 'load') {
+    // Actually load
+    const code = editorCodeEl.value.trim();
+    if (code) {
+      const ok = editor.load(code);
+      if (!ok) alert('Invalid level code.');
+    }
+    editorCodeEl.style.display = 'none';
+    editorCodeVisible = false;
+    editorCodeMode = null;
+  } else {
+    editorCodeEl.value = '';
+    editorCodeEl.style.display = 'block';
+    editorCodeEl.placeholder = 'Paste level code here, then click Load Code again...';
+    editorCodeEl.focus();
+    editorCodeMode = 'load';
+    editorCodeVisible = true;
+  }
+});
+
+btnEditorClear.addEventListener('click', () => {
+  if (!editor) return;
+  if (confirm('Clear the entire grid?')) editor.clear();
+});
+
+btnEditorExit.addEventListener('click', () => {
+  if (!editor) return;
+  editor.destroy();
+  editor = null;
+  editorMode = false;
+  editorUI.style.display = 'none';
+  editorCodeEl.style.display = 'none';
+  editorCodeVisible = false;
+  editorCodeMode = null;
+  btnEditorTest.style.display = '';
+  btnEditorStop.style.display = 'none';
+  editorToolsEl.style.display = '';
+  showScreen('lobby');
 });
 
 modeSelect.addEventListener('change', () => {

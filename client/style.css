@@ -477,3 +477,139 @@ body {
   background: rgba(255,215,0,0.9);
   color: #333;
 }
+
+/* Editor UI */
+#editor-ui {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#editor-toolbar {
+  position: fixed;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+#editor-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(20, 20, 40, 0.85);
+  border-radius: 12px;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(8px);
+}
+
+.editor-tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.8);
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.editor-tool-btn:hover {
+  background: rgba(255,255,255,0.15);
+}
+
+.editor-tool-btn.active {
+  border-color: #fff;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+}
+
+.editor-tool-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.editor-tool-key {
+  font-size: 0.8em;
+  color: rgba(255,255,255,0.4);
+  margin-left: auto;
+}
+
+#editor-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(20, 20, 40, 0.85);
+  border-radius: 12px;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  backdrop-filter: blur(8px);
+}
+
+.editor-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85);
+  font-family: inherit;
+  font-size: 0.8em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.editor-btn:hover {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+}
+
+.editor-btn-exit {
+  background: rgba(255,100,100,0.3) !important;
+  color: rgba(255,150,150,0.9) !important;
+}
+
+.editor-btn-exit:hover {
+  background: rgba(255,100,100,0.5) !important;
+  color: #fff !important;
+}
+
+#editor-code {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  max-width: 600px;
+  height: 80px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(20, 20, 40, 0.9);
+  color: #fff;
+  font-family: monospace;
+  font-size: 0.85em;
+  resize: none;
+  outline: none;
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+}
+
+#editor-code::placeholder {
+  color: rgba(255,255,255,0.4);
+}
