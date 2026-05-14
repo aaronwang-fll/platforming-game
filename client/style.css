@@ -483,47 +483,50 @@ body {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
   z-index: 20;
   pointer-events: none;
 }
 
 #editor-toolbar {
   position: fixed;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  flex-direction: row;
+  gap: 6px;
+  align-items: flex-end;
   pointer-events: auto;
 }
 
 #editor-tools {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: rgba(20, 20, 40, 0.85);
-  border-radius: 12px;
-  padding: 8px;
+  flex-direction: row;
+  gap: 3px;
+  background: rgba(20, 20, 40, 0.9);
+  border-radius: 10px;
+  padding: 5px;
   border: 1px solid rgba(255,255,255,0.12);
-  backdrop-filter: blur(8px);
 }
 
 .editor-tool-btn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
+  gap: 2px;
+  padding: 4px 6px;
   border: 2px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.7);
   font-family: inherit;
-  font-size: 0.8em;
+  font-size: 0.65em;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
   white-space: nowrap;
+  min-width: 42px;
 }
 
 .editor-tool-btn:hover {
@@ -537,38 +540,38 @@ body {
 }
 
 .editor-tool-swatch {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 3px;
   flex-shrink: 0;
   border: 1px solid rgba(255,255,255,0.2);
 }
 
 .editor-tool-key {
-  font-size: 0.8em;
-  color: rgba(255,255,255,0.4);
-  margin-left: auto;
+  font-size: 0.85em;
+  color: rgba(255,255,255,0.35);
 }
 
 #editor-actions {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  background: rgba(20, 20, 40, 0.85);
-  border-radius: 12px;
-  padding: 8px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 3px;
+  background: rgba(20, 20, 40, 0.9);
+  border-radius: 10px;
+  padding: 5px;
   border: 1px solid rgba(255,255,255,0.12);
   backdrop-filter: blur(8px);
 }
 
 .editor-btn {
-  padding: 8px 14px;
+  padding: 5px 10px;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   background: rgba(255,255,255,0.12);
   color: rgba(255,255,255,0.85);
   font-family: inherit;
-  font-size: 0.8em;
+  font-size: 0.7em;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s;
@@ -592,10 +595,7 @@ body {
 .editor-size-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding-bottom: 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
-  margin-bottom: 2px;
+  gap: 3px;
 }
 
 .editor-size-row label {
@@ -608,8 +608,8 @@ body {
 }
 
 .editor-size-input {
-  width: 44px;
-  padding: 4px 5px;
+  width: 36px;
+  padding: 3px 4px;
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 5px;
   background: rgba(255,255,255,0.08);
