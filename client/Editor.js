@@ -306,13 +306,12 @@ export class Editor {
     const offY = startRow * CELL;
     const platforms = [];
 
-    // Walls start at the first block row (not the sky rows above)
-    const wallTop = (minRow - startRow) * CELL;
-    platforms.push({ x: 0, y: wallTop, w: 20, h: mapH - wallTop });
-    platforms.push({ x: mapW - 20, y: wallTop, w: 20, h: mapH - wallTop });
+    // Invisible boundary walls (collision only, not rendered)
+    platforms.push({ x: -20, y: 0, w: 20, h: mapH, _invisible: true });
+    platforms.push({ x: mapW, y: 0, w: 20, h: mapH, _invisible: true });
 
-    // Auto floor at bottom
-    platforms.push({ x: 0, y: mapH - CELL, w: mapW, h: CELL });
+    // Invisible floor at bottom
+    platforms.push({ x: -20, y: mapH, w: mapW + 40, h: 32, _invisible: true });
 
     // Merge adjacent same-type horizontal cells into platforms
     // Coordinates are offset so the map starts at (0,0)

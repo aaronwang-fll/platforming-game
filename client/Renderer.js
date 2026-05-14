@@ -83,6 +83,7 @@ export class Renderer {
     const ctx = this.ctx;
 
     for (const p of platforms) {
+      if (p._invisible) continue;
 
       // --- Trampoline ---
       if (p.type === 'trampoline') {
