@@ -276,48 +276,60 @@ export class Editor {
   }
 
   toMap() {
-    // Find the bounding box of all placed blocks
-    let maxCol = 0, maxRow = 0;
+    // Find bounding box of all placed blocks
+    let minCol = this.cols, minRow = this.rows, maxCol = 0, maxRow = 0;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.grid[r][c] !== 0) {
+          if (c < minCol) minCol = c;
           if (c + 1 > maxCol) maxCol = c + 1;
+          if (r < minRow) minRow = r;
           if (r + 1 > maxRow) maxRow = r + 1;
         }
       }
     }
 
-    // Add 1 row for floor below lowest block, clamp to at least a small map
-    maxRow = Math.max(maxRow + 1, 5);
-    maxCol = Math.max(maxCol, 5);
+    // No blocks placed — make a tiny default map
+    if (maxCol === 0) {
+      minCol = 0; minRow = 0; maxCol = 5; maxRow = 5;
+    }
 
-    const mapW = maxCol * CELL;
-    const mapH = maxRow * CELL;
+    // Add 1 cell padding on left/right for walls, 1 row below for floor
+    const startCol = Math.max(0, minCol - 1);
+    const startRow = Math.max(0, minRow - 1);
+    const endCol = Math.min(this.cols, maxCol + 1);
+    const endRow = maxRow + 1; // +1 for auto floor
+
+    const mapW = (endCol - startCol) * CELL;
+    const mapH = (endRow - startRow) * CELL;
+    const offX = startCol * CELL;
+    const offY = startRow * CELL;
     const platforms = [];
 
-    // Boundary walls
+    // Boundary walls — full height on left and right edges
     platforms.push({ x: 0, y: 0, w: 20, h: mapH });
     platforms.push({ x: mapW - 20, y: 0, w: 20, h: mapH });
 
-    // Auto floor at bottom (1 row below lowest block)
+    // Auto floor at bottom
     platforms.push({ x: 0, y: mapH - CELL, w: mapW, h: CELL });
 
     // Merge adjacent same-type horizontal cells into platforms
-    for (let r = 0; r < maxRow - 1; r++) {
-      let c = 0;
-      while (c < maxCol) {
+    // Coordinates are offset so the map starts at (0,0)
+    for (let r = startRow; r < maxRow; r++) {
+      let c = startCol;
+      while (c < endCol) {
         const type = this.grid[r]?.[c] || 0;
         if (type === 0) { c++; continue; }
 
         if (type === 2) {
-          let startC = c;
-          while (c < maxCol && (this.grid[r]?.[c] || 0) === 2) c++;
-          const cellCount = c - startC;
+          let sc = c;
+          while (c < endCol && (this.grid[r]?.[c] || 0) === 2) c++;
+          const cellCount = c - sc;
           for (let i = 0; i < cellCount; i += 2) {
             const tw = Math.min(2, cellCount - i) * CELL;
             platforms.push({
-              x: (startC + i) * CELL,
-              y: r * CELL + CELL - 12,
+              x: (sc + i) * CELL - offX,
+              y: r * CELL - offY + CELL - 12,
               w: tw, h: 12,
               type: 'trampoline',
             });
@@ -325,12 +337,12 @@ export class Editor {
           continue;
         }
 
-        const startC = c;
-        while (c < maxCol && (this.grid[r]?.[c] || 0) === type) c++;
+        const sc = c;
+        while (c < endCol && (this.grid[r]?.[c] || 0) === type) c++;
         const plat = {
-          x: startC * CELL,
-          y: r * CELL,
-          w: (c - startC) * CELL,
+          x: sc * CELL - offX,
+          y: r * CELL - offY,
+          w: (c - sc) * CELL,
           h: CELL,
         };
         if (type !== 1) plat.type = TYPE_NAMES[type];
@@ -339,8 +351,8 @@ export class Editor {
       }
     }
 
-    // Find spawn points
-    const spawns = this._findSpawns(8, maxCol, maxRow);
+    // Find spawn points (pass offset info)
+    const spawns = this._findSpawns(8, startCol, startRow, endCol, endRow, offX, offY, mapW, mapH);
 
     return {
       name: 'Custom',
@@ -353,22 +365,20 @@ export class Editor {
     };
   }
 
-  // Find safe spawn positions
-  // useCols/useRows = the capped map dimensions used by toMap()
-  _findSpawns(count, useCols, useRows) {
+  _findSpawns(count, startCol, startRow, endCol, endRow, offX, offY, mapW, mapH) {
     const SOLID_TYPES = new Set([1, 3, 4]);
     const spots = [];
 
-    for (let c = 1; c < useCols - 1; c++) {
-      for (let r = 1; r < useRows; r++) {
+    for (let c = startCol; c < endCol; c++) {
+      for (let r = startRow + 1; r < endRow; r++) {
         const below = this.grid[r]?.[c] || 0;
         const here = this.grid[r - 1]?.[c] || 0;
         if (SOLID_TYPES.has(below) && here === 0) {
           const above = r >= 2 ? (this.grid[r - 2]?.[c] || 0) : 0;
           if (above === 0) {
             spots.push({
-              x: c * CELL + (CELL - PLAYER_WIDTH) / 2,
-              y: r * CELL - PLAYER_HEIGHT,
+              x: c * CELL - offX + (CELL - PLAYER_WIDTH) / 2,
+              y: r * CELL - offY - PLAYER_HEIGHT,
             });
             break;
           }
@@ -378,11 +388,10 @@ export class Editor {
 
     // Fallback: spawn on the auto-floor at the bottom
     if (spots.length === 0) {
-      const floorY = (useRows - 1) * CELL;
       for (let i = 0; i < count; i++) {
         spots.push({
-          x: 40 + (useCols * CELL - 80) * (i / Math.max(1, count - 1)),
-          y: floorY - PLAYER_HEIGHT,
+          x: 40 + (mapW - 80) * (i / Math.max(1, count - 1)),
+          y: mapH - CELL - PLAYER_HEIGHT,
         });
       }
       return spots;
