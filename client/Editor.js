@@ -29,8 +29,9 @@ export class Editor {
     this.rows = DEFAULT_ROWS;
     this.grid = this.makeGrid();
     this.tool = 1;
+    // Start camera at bottom-left
     this.camX = 0;
-    this.camY = 0;
+    this.camY = Math.max(0, this.rows * CELL - CANVAS_HEIGHT);
     this.mouseX = -1;
     this.mouseY = -1;
     this.painting = false;
