@@ -294,9 +294,9 @@ export class Editor {
       minCol = 0; minRow = 0; maxCol = 5; maxRow = 5;
     }
 
-    // Pad left/right by 1 col for walls, 2 rows above for sky, 1 row below for floor
+    // Pad: 1 col each side for walls, 20 rows above for sky + ceiling, 1 row below for floor
     const startCol = Math.max(0, minCol - 1);
-    const startRow = Math.max(0, minRow - 2); // 2 rows of sky above topmost block
+    const startRow = Math.max(0, minRow - 21); // 20 rows of sky + 1 for ceiling
     const endCol = Math.min(this.cols, maxCol + 1);
     const endRow = maxRow + 1; // +1 for auto floor
 
@@ -306,8 +306,12 @@ export class Editor {
     const offY = startRow * CELL;
     const platforms = [];
 
-    // Visible side walls (start at first block row, no ceiling)
-    const wallTop = (minRow - startRow) * CELL;
+    // Visible ceiling at top
+    const ceilingY = (minRow - startRow - 20) * CELL;
+    platforms.push({ x: 0, y: Math.max(0, ceilingY), w: mapW, h: CELL });
+
+    // Visible side walls (full height from ceiling to floor)
+    const wallTop = Math.max(0, ceilingY);
     platforms.push({ x: 0, y: wallTop, w: 20, h: mapH - wallTop });
     platforms.push({ x: mapW - 20, y: wallTop, w: 20, h: mapH - wallTop });
 
