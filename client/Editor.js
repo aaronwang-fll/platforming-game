@@ -87,8 +87,16 @@ export class Editor {
       this.erasing = true;
       this._paintCell(col, row, 0);
     } else if (e.button === 0) {
-      this.painting = true;
-      this._paintCell(col, row, this.tool);
+      // Toggle: if cell already has this type, erase it
+      if (col >= 0 && col < this.cols && row >= 0 && row < this.rows && this.grid[row][col] === this.tool) {
+        this.painting = true;
+        this._paintingAs = 0;
+        this._paintCell(col, row, 0);
+      } else {
+        this.painting = true;
+        this._paintingAs = this.tool;
+        this._paintCell(col, row, this.tool);
+      }
     }
   }
 
@@ -99,7 +107,7 @@ export class Editor {
 
     if (this.testing) return;
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
-    if (this.painting) this._paintCell(col, row, this.tool);
+    if (this.painting) this._paintCell(col, row, this._paintingAs);
     if (this.erasing) this._paintCell(col, row, 0);
   }
 
