@@ -1,633 +1,851 @@
-// Connected-structure map design
-// Platforms form rooms, corridors, L-shapes, and U-shapes
-// Walls connect horizontal platforms — no floating isolated platforms
+// Map design for multiplayer tag platformer
+// Physics: single jump 117px, double jump 203px, trampoline 211px
+// Player 26x26, move speed 3.5 px/tick
 // All platforms 32px tall, walls 32px wide, trampolines 64x12
-// Player 26x26, jump ~114px, double jump adds ~86px (total ~200px)
-// Wall heights 128-192px (climbable with double jump)
-// Speed pads 300-400px wide
-// Crumble bridges 96-128px wide
-// Jumpthrough platforms always have a surface below to jump from
+// Max 100px vertical gap between adjacent reachable surfaces
+// Ground is always continuous — no death pits
 
 export const maps = {
   playground: {
     name: 'Playground',
-    width: 1600,
-    height: 900,
+    width: 2000,
+    height: 1200,
     bg: '#7EC8E3',
     theme: 'sky',
     platforms: [
       // ============================================================
-      // FLOOR — continuous ground, no death pits
+      // GROUND FLOOR — continuous, y = 1168
       // ============================================================
-      { x: 0, y: 868, w: 1600, h: 32 },
+      { x: 0, y: 1168, w: 2000, h: 32 },
 
       // ============================================================
-      // LEFT ROOM — U-shape (x: 32–384)
-      // Floor at y:740, walls rising to y:580
-      // Open top, entry gap on right wall
+      // GROUND-LEVEL SPEED PADS — long corridors for chasing
       // ============================================================
-      // Left room floor
-      { x: 32, y: 740, w: 352, h: 32 },
-      // Left wall (full height)
-      { x: 32, y: 580, w: 32, h: 160 },
-      // Right wall — UPPER portion only (gap at bottom for entry)
-      { x: 352, y: 580, w: 32, h: 96 },
-      // Jumpthrough inside U-shape (can jump up from room floor at 740)
-      { x: 96, y: 644, w: 224, h: 32, type: 'jumpthrough' },
-      // Small shelf on left wall interior
-      { x: 64, y: 580, w: 128, h: 32 },
+      // Left speed pad
+      { x: 40, y: 1136, w: 380, h: 32, type: 'dash_block' },
+      // Right speed pad
+      { x: 1580, y: 1136, w: 380, h: 32, type: 'dash_block' },
 
       // ============================================================
-      // LEFT-TO-CENTER CORRIDOR (x: 384–640)
-      // Connects left room to center room at mid-height
+      // LEVEL 1 — y = 1068 (100px above ground)
+      // Left staircase entry, right staircase entry, center trampoline shortcut
       // ============================================================
-      // Corridor floor
-      { x: 384, y: 740, w: 256, h: 32 },
-      // Crumble shortcut above corridor
-      { x: 416, y: 644, w: 128, h: 32, type: 'crumble' },
-      // Trampoline on corridor floor
-      { x: 480, y: 728, w: 64, h: 12, type: 'trampoline' },
+
+      // -- Left staircase: 3 stepping stones from ground to L1 --
+      { x: 40, y: 1118, w: 128, h: 32 },       // step 1 (50px up from ground)
+      { x: 40, y: 1068, w: 200, h: 32 },        // L1 left platform
+
+      // -- Left L1 main platform --
+      { x: 200, y: 1068, w: 400, h: 32 },
+
+      // -- Center gap bridged by jumpthrough --
+      // Trampoline on ground, directly below this jumpthrough
+      { x: 700, y: 1068, w: 300, h: 32, type: 'jumpthrough' },
+
+      // -- Right L1 main platform --
+      { x: 1100, y: 1068, w: 500, h: 32 },
+
+      // -- Right staircase entry --
+      { x: 1760, y: 1068, w: 200, h: 32 },
+      { x: 1830, y: 1118, w: 128, h: 32 },      // step from ground
+
+      // -- Crumble bridge connecting left and right L1 across center --
+      { x: 880, y: 1068, w: 120, h: 32, type: 'crumble' },
 
       // ============================================================
-      // CENTER ROOM — large room with walls (x: 608–1024)
-      // Floor at y:740, walls to y:548 (192px tall)
-      // Gaps in walls for entries: bottom-left, bottom-right, top openings
+      // LEVEL 2 — y = 968 (100px above L1)
+      // Accessible by single jump from L1
       // ============================================================
-      // Center room floor
-      { x: 608, y: 740, w: 416, h: 32 },
-      // Left wall — upper section (gap at bottom, 64px gap for entry)
-      { x: 608, y: 548, w: 32, h: 128 },
-      // Right wall — upper section (gap at bottom for entry)
-      { x: 992, y: 548, w: 32, h: 128 },
-      // Center room ceiling/upper platform
-      { x: 608, y: 548, w: 416, h: 32 },
-      // Speed pad inside center room (on room floor)
-      { x: 672, y: 708, w: 320, h: 32, type: 'dash_block' },
-      // Jumpthrough mid-level inside room (above speed pad, below ceiling)
-      { x: 672, y: 628, w: 288, h: 32, type: 'jumpthrough' },
+
+      // -- Left L2 platform (above left staircase area) --
+      { x: 40, y: 968, w: 300, h: 32 },
+      // Left wall forming structure with L1
+      { x: 40, y: 968, w: 32, h: 100 },
+
+      // -- Center-left L2 platform --
+      { x: 440, y: 968, w: 250, h: 32 },
+
+      // -- Center L2 — wide jumpthrough (can jump up from L1 jumpthrough below) --
+      { x: 750, y: 968, w: 280, h: 32, type: 'jumpthrough' },
+
+      // -- Center-right L2 platform --
+      { x: 1100, y: 968, w: 250, h: 32 },
+
+      // -- Right L2 platform --
+      { x: 1500, y: 968, w: 300, h: 32 },
+      // Right wall forming structure with L1
+      { x: 1768, y: 968, w: 32, h: 100 },
+
+      // -- Speed pad on L2 left --
+      { x: 60, y: 936, w: 260, h: 32, type: 'dash_block' },
 
       // ============================================================
-      // CENTER-TO-RIGHT CORRIDOR (x: 1024–1216)
+      // LEVEL 3 — y = 868 (100px above L2)
+      // Single jump from L2
       // ============================================================
-      // Corridor floor
-      { x: 1024, y: 740, w: 192, h: 32 },
-      // Crumble bridge at upper level
-      { x: 1056, y: 580, w: 128, h: 32, type: 'crumble' },
+
+      // -- Left L3 —  upper left room roof --
+      { x: 80, y: 868, w: 200, h: 32 },
+
+      // -- Center-left L3 stepping stone --
+      { x: 380, y: 868, w: 160, h: 32 },
+
+      // -- Center L3 — main crossing platform --
+      { x: 640, y: 868, w: 400, h: 32 },
+      // Walls on center platform creating an open room
+      { x: 640, y: 768, w: 32, h: 100 },
+      { x: 1008, y: 768, w: 32, h: 100 },
+
+      // -- Center-right L3 stepping stone --
+      { x: 1140, y: 868, w: 160, h: 32 },
+
+      // -- Right L3 — upper right room roof --
+      { x: 1500, y: 868, w: 200, h: 32 },
+
+      // -- Oneway drops on L3 edges --
+      { x: 340, y: 868, w: 80, h: 32, type: 'oneway' },
+      { x: 1360, y: 868, w: 80, h: 32, type: 'oneway' },
 
       // ============================================================
-      // RIGHT ROOM — L-shape (x: 1184–1568)
-      // Horizontal base + vertical wall forming an L
+      // LEVEL 4 — y = 768 (100px above L3)
+      // Requires single jump from L3; trampolines help from lower
       // ============================================================
-      // Right room base floor
-      { x: 1184, y: 740, w: 384, h: 32 },
-      // Right outer wall (full height)
-      { x: 1536, y: 548, w: 32, h: 192 },
-      // Right room upper shelf (forms the L top)
-      { x: 1312, y: 548, w: 256, h: 32 },
-      // Interior wall stub (creates sub-room)
-      { x: 1312, y: 612, w: 32, h: 128 },
-      // Jumpthrough inside L-shape
-      { x: 1216, y: 644, w: 224, h: 32, type: 'jumpthrough' },
+
+      // -- Left L4 platform --
+      { x: 120, y: 768, w: 220, h: 32 },
+
+      // -- Center L4 — ceiling of center room, wide crossing --
+      { x: 640, y: 768, w: 400, h: 32 },
+
+      // -- Right L4 platform --
+      { x: 1440, y: 768, w: 220, h: 32 },
+
+      // -- Crumble bridge connecting left L4 to center L4 --
+      { x: 420, y: 768, w: 120, h: 32, type: 'crumble' },
+
+      // -- Crumble bridge connecting center L4 to right L4 --
+      { x: 1140, y: 768, w: 120, h: 32, type: 'crumble' },
 
       // ============================================================
-      // UPPER LEVEL — stepping stones and oneway platforms
-      // (x: various, y: 420–460 range)
+      // LEVEL 5 — y = 668 (100px above L4) — top level
+      // Requires trampolines or wall-jump to reach from L4
       // ============================================================
-      // Above left room
-      { x: 64, y: 452, w: 128, h: 32 },
-      // Stepping stone left-center
-      { x: 256, y: 420, w: 96, h: 32 },
-      // Oneway over center room
-      { x: 544, y: 420, w: 160, h: 32, type: 'oneway' },
-      // Stepping stone center
-      { x: 784, y: 388, w: 96, h: 32 },
-      // Oneway over right area
-      { x: 960, y: 420, w: 160, h: 32, type: 'oneway' },
-      // Above right room
-      { x: 1216, y: 420, w: 128, h: 32 },
-      // Top perch
-      { x: 1408, y: 388, w: 96, h: 32 },
+
+      // -- Left top platform --
+      { x: 200, y: 668, w: 200, h: 32 },
+
+      // -- Center top platform (king of the hill) --
+      { x: 800, y: 668, w: 200, h: 32 },
+
+      // -- Right top platform --
+      { x: 1400, y: 668, w: 200, h: 32 },
+
+      // -- Oneway drop platforms connecting top level --
+      { x: 500, y: 668, w: 100, h: 32, type: 'oneway' },
+      { x: 1200, y: 668, w: 100, h: 32, type: 'oneway' },
 
       // ============================================================
-      // GROUND LEVEL FEATURES
+      // TRAMPOLINES
       // ============================================================
-      // Speed pad on ground (left area)
-      { x: 64, y: 836, w: 320, h: 32, type: 'dash_block' },
-      // Speed pad on ground (right area)
-      { x: 1216, y: 836, w: 320, h: 32, type: 'dash_block' },
-      // Trampoline left ground
-      { x: 32, y: 856, w: 64, h: 12, type: 'trampoline' },
-      // Trampoline right ground
-      { x: 1504, y: 856, w: 64, h: 12, type: 'trampoline' },
-      // Trampoline center ground
-      { x: 768, y: 856, w: 64, h: 12, type: 'trampoline' },
+      // Ground-level center trampoline — launches up through L1 jumpthrough
+      { x: 818, y: 1156, w: 64, h: 12, type: 'trampoline' },
+      // Ground-level left trampoline
+      { x: 500, y: 1156, w: 64, h: 12, type: 'trampoline' },
+      // Ground-level right trampoline
+      { x: 1436, y: 1156, w: 64, h: 12, type: 'trampoline' },
+
+      // L1 trampoline — launches up through L2 jumpthrough
+      { x: 850, y: 1056, w: 64, h: 12, type: 'trampoline' },
+
+      // L3 center room trampoline — launches to L5
+      { x: 870, y: 856, w: 64, h: 12, type: 'trampoline' },
+
+      // L4 trampoline on left — launches to L5
+      { x: 250, y: 756, w: 64, h: 12, type: 'trampoline' },
+
+      // ============================================================
+      // WALL-JUMP PILLARS
+      // ============================================================
+      // Left pillar (ground to L2 area)
+      { x: 460, y: 968, w: 32, h: 200 },
+      // Right pillar (ground to L2 area)
+      { x: 1380, y: 968, w: 32, h: 200 },
+      // Center-left pillar (L2 to L4)
+      { x: 560, y: 768, w: 32, h: 200 },
+      // Center-right pillar (L2 to L4)
+      { x: 1080, y: 768, w: 32, h: 200 },
 
       // ============================================================
       // BOUNDARY WALLS
       // ============================================================
-      { x: 0, y: 0, w: 20, h: 900 },
-      { x: 1580, y: 0, w: 20, h: 900 },
+      { x: 0, y: 0, w: 20, h: 1200 },
+      { x: 1980, y: 0, w: 20, h: 1200 },
     ],
     spawns: [
-      { x: 100, y: 828 }, { x: 260, y: 828 }, { x: 440, y: 828 },
-      { x: 640, y: 828 }, { x: 840, y: 828 }, { x: 1060, y: 828 },
-      { x: 1280, y: 828 }, { x: 1460, y: 828 },
+      { x: 100, y: 1128 }, { x: 300, y: 1128 }, { x: 520, y: 1128 },
+      { x: 750, y: 1128 }, { x: 1000, y: 1128 }, { x: 1250, y: 1128 },
+      { x: 1500, y: 1128 }, { x: 1750, y: 1128 },
     ],
   },
 
   rooftops: {
     name: 'Rooftops',
-    width: 1800,
-    height: 1000,
+    width: 2200,
+    height: 1300,
     bg: '#0d1b2a',
     theme: 'rooftops',
     platforms: [
       // ============================================================
-      // FLOOR — continuous ground
+      // GROUND — continuous street level, y = 1268
       // ============================================================
-      { x: 0, y: 968, w: 1800, h: 32 },
+      { x: 0, y: 1268, w: 2200, h: 32 },
 
       // ============================================================
-      // BUILDING 1 — tall left building (x: 32–320)
-      // Roof at y:620, two internal floors
+      // GROUND SPEED PADS — street-level running
       // ============================================================
-      // Roof
-      { x: 32, y: 620, w: 288, h: 32 },
+      { x: 50, y: 1236, w: 400, h: 32, type: 'dash_block' },
+      { x: 1750, y: 1236, w: 400, h: 32, type: 'dash_block' },
+
+      // ============================================================
+      // BUILDING 1 — short left building (x: 40–420)
+      // Roof at L2 = y:1068, internal floor at L1 = y:1168
+      // ============================================================
       // Left wall
-      { x: 32, y: 620, w: 32, h: 348 },
-      // Right wall — gap at bottom for ground entry (128px gap)
-      { x: 288, y: 620, w: 32, h: 192 },
-      // Internal floor 1 (fire escape / jumpthrough)
-      { x: 64, y: 780, w: 224, h: 32, type: 'jumpthrough' },
-      // Internal floor 2 (jumpthrough)
-      { x: 96, y: 700, w: 192, h: 32, type: 'jumpthrough' },
+      { x: 40, y: 1068, w: 32, h: 200 },
+      // Right wall — gap at bottom for ground entry
+      { x: 388, y: 1068, w: 32, h: 100 },
+      // Internal floor (L1 = 100px above ground)
+      { x: 40, y: 1168, w: 380, h: 32 },
+      // Jumpthrough mid-level (fire escape)
+      { x: 72, y: 1118, w: 280, h: 32, type: 'jumpthrough' },
+      // Roof
+      { x: 40, y: 1068, w: 380, h: 32 },
       // Speed pad on roof
-      { x: 32, y: 588, w: 288, h: 32, type: 'dash_block' },
+      { x: 60, y: 1036, w: 340, h: 32, type: 'dash_block' },
 
       // ============================================================
-      // CORRIDOR 1→2 — skybridge (x: 320–544)
+      // FIRE ESCAPE — Building 1 exterior right (staircase up)
+      // Steps from ground to roof, 50-80px gaps
       // ============================================================
-      // Bridge floor
-      { x: 320, y: 780, w: 224, h: 32 },
-      // Bridge walls (short, chest height)
-      { x: 320, y: 716, w: 32, h: 64 },
-      { x: 512, y: 716, w: 32, h: 64 },
-      // Crumble shortcut above bridge
-      { x: 368, y: 684, w: 128, h: 32, type: 'crumble' },
+      { x: 420, y: 1198, w: 96, h: 32 },      // step 1 (70px above ground)
+      { x: 420, y: 1128, w: 96, h: 32 },      // step 2 (70px up)
+      { x: 420, y: 1068, w: 96, h: 32 },      // step 3 reaches roof level
 
       // ============================================================
-      // BUILDING 2 — wide center-left building (x: 512–864)
-      // Roof at y:700, one internal floor
+      // SKYBRIDGE 1→2 (x: 420–620)
       // ============================================================
-      // Roof
-      { x: 512, y: 700, w: 352, h: 32 },
-      // Left wall (gap at top for corridor entry)
-      { x: 512, y: 780, w: 32, h: 188 },
-      // Right wall — upper portion only
-      { x: 832, y: 700, w: 32, h: 128 },
-      // Internal jumpthrough
-      { x: 544, y: 844, w: 288, h: 32, type: 'jumpthrough' },
-      // Fire escape platforms (exterior right side)
-      { x: 864, y: 844, w: 96, h: 32 },
-      { x: 864, y: 780, w: 96, h: 32 },
+      { x: 516, y: 1068, w: 104, h: 32 },
+      // Crumble shortcut above skybridge
+      { x: 480, y: 968, w: 120, h: 32, type: 'crumble' },
 
       // ============================================================
-      // CORRIDOR 2→3 — chase corridor at ground level (x: 864–1088)
+      // BUILDING 2 — tall center-left building (x: 580–920)
+      // Roof at L3 = y:968, floors at L2 and L1
       // ============================================================
-      // Corridor ceiling
-      { x: 864, y: 844, w: 224, h: 32 },
-      // Speed pad on ground in corridor
-      { x: 896, y: 936, w: 320, h: 32, type: 'dash_block' },
-
-      // ============================================================
-      // BUILDING 3 — center-right building (x: 1056–1376)
-      // Roof at y:652, tallest building
-      // ============================================================
-      // Roof
-      { x: 1056, y: 652, w: 320, h: 32 },
       // Left wall
-      { x: 1056, y: 652, w: 32, h: 316 },
-      // Right wall — gap in middle for entry (64px gap)
-      { x: 1344, y: 652, w: 32, h: 128 },
-      { x: 1344, y: 876, w: 32, h: 92 },
-      // Internal floor (jumpthrough)
-      { x: 1088, y: 812, w: 256, h: 32, type: 'jumpthrough' },
-      // Internal shelf
-      { x: 1088, y: 732, w: 160, h: 32 },
+      { x: 580, y: 968, w: 32, h: 300 },
+      // Right wall — gap in middle for entry
+      { x: 888, y: 968, w: 32, h: 140 },
+      { x: 888, y: 1188, w: 32, h: 80 },
+      // Internal floor 1 (L1 = y:1168)
+      { x: 580, y: 1168, w: 340, h: 32 },
+      // Jumpthrough internal (L1.5 = y:1068)
+      { x: 612, y: 1068, w: 280, h: 32, type: 'jumpthrough' },
+      // Roof (L3)
+      { x: 580, y: 968, w: 340, h: 32 },
+      // Trampoline inside building on floor — launches through jumpthrough
+      { x: 720, y: 1156, w: 64, h: 12, type: 'trampoline' },
+
+      // -- Fire escape exterior right of Building 2 --
+      { x: 920, y: 1168, w: 96, h: 32 },
+      { x: 920, y: 1068, w: 96, h: 32 },
+      { x: 920, y: 968, w: 96, h: 32 },
+
+      // ============================================================
+      // SKYBRIDGE 2→3 (x: 1016–1160)
+      // ============================================================
+      { x: 1016, y: 1068, w: 144, h: 32 },
+      // Upper walkway
+      { x: 1016, y: 968, w: 144, h: 32, type: 'oneway' },
+
+      // ============================================================
+      // BUILDING 3 — wide center building (x: 1120–1560)
+      // Roof at L3 = y:968, tallest main building
+      // ============================================================
+      // Left wall
+      { x: 1120, y: 868, w: 32, h: 300 },
+      // Right wall — gap at bottom
+      { x: 1528, y: 868, w: 32, h: 200 },
+      // Internal floor 1 (y:1168)
+      { x: 1120, y: 1168, w: 440, h: 32 },
+      // Jumpthrough mid (y:1068)
+      { x: 1152, y: 1068, w: 380, h: 32, type: 'jumpthrough' },
+      // Internal solid floor (y:968)
+      { x: 1120, y: 968, w: 440, h: 32 },
+      // Roof (L4 = y:868)
+      { x: 1120, y: 868, w: 440, h: 32 },
       // Speed pad on roof
-      { x: 1088, y: 620, w: 288, h: 32, type: 'dash_block' },
+      { x: 1160, y: 836, w: 360, h: 32, type: 'dash_block' },
+      // Interior pillar for wall-jump
+      { x: 1340, y: 968, w: 32, h: 200 },
+      // Trampoline on internal floor 1 — launches through jumpthrough
+      { x: 1300, y: 1156, w: 64, h: 12, type: 'trampoline' },
+
+      // -- Fire escape exterior right of Building 3 --
+      { x: 1560, y: 1198, w: 96, h: 32 },
+      { x: 1560, y: 1098, w: 96, h: 32 },
+      { x: 1560, y: 998, w: 96, h: 32 },
 
       // ============================================================
-      // CORRIDOR 3→4 — elevated bridge (x: 1376–1504)
+      // SKYBRIDGE 3→4 (x: 1560–1700)
       // ============================================================
-      { x: 1376, y: 780, w: 128, h: 32 },
-      // Crumble shortcut at roof level
-      { x: 1376, y: 652, w: 128, h: 32, type: 'crumble' },
+      { x: 1656, y: 1068, w: 100, h: 32 },
+      // Crumble shortcut
+      { x: 1620, y: 868, w: 120, h: 32, type: 'crumble' },
 
       // ============================================================
-      // BUILDING 4 — right building (x: 1472–1768)
-      // Roof at y:732
+      // BUILDING 4 — right building (x: 1720–2060)
+      // Roof at L2 = y:1068
       // ============================================================
-      // Roof
-      { x: 1472, y: 732, w: 296, h: 32 },
-      // Left wall — partial
-      { x: 1472, y: 732, w: 32, h: 128 },
+      // Left wall — gap at bottom
+      { x: 1720, y: 1068, w: 32, h: 100 },
       // Right wall
-      { x: 1736, y: 732, w: 32, h: 236 },
-      // Internal jumpthrough
-      { x: 1504, y: 844, w: 232, h: 32, type: 'jumpthrough' },
+      { x: 2028, y: 1068, w: 32, h: 200 },
+      // Internal floor (y:1168)
+      { x: 1720, y: 1168, w: 340, h: 32 },
+      // Jumpthrough inside (y:1118)
+      { x: 1752, y: 1118, w: 260, h: 32, type: 'jumpthrough' },
+      // Roof
+      { x: 1720, y: 1068, w: 340, h: 32 },
       // Speed pad on roof
-      { x: 1472, y: 700, w: 296, h: 32, type: 'dash_block' },
+      { x: 1740, y: 1036, w: 300, h: 32, type: 'dash_block' },
+
+      // -- Fire escape left of Building 4 --
+      { x: 1656, y: 1168, w: 96, h: 32 },
 
       // ============================================================
-      // UPPER ROOFTOP PLATFORMS — above buildings
+      // UPPER ROOFTOP LEVEL — y:868 and above
+      // Above buildings, connected platforms
       // ============================================================
-      // Above building 1
-      { x: 96, y: 500, w: 128, h: 32 },
-      // Stepping stone
-      { x: 320, y: 480, w: 96, h: 32 },
-      // Above corridor 1-2
-      { x: 480, y: 540, w: 128, h: 32, type: 'oneway' },
-      // Above building 2
-      { x: 640, y: 500, w: 128, h: 32 },
-      // Central high platform
-      { x: 864, y: 460, w: 160, h: 32 },
-      // Above building 3
-      { x: 1120, y: 500, w: 128, h: 32, type: 'oneway' },
-      // Stepping stones right
-      { x: 1376, y: 520, w: 96, h: 32 },
-      // Above building 4
-      { x: 1536, y: 540, w: 128, h: 32 },
+      // Above Building 1 — ladder up from roof
+      { x: 80, y: 968, w: 180, h: 32 },
+      // Above skybridge 1-2
+      { x: 360, y: 868, w: 160, h: 32 },
+      // Above Building 2
+      { x: 620, y: 868, w: 200, h: 32 },
+      // Stepping stones across upper level
+      { x: 900, y: 868, w: 120, h: 32, type: 'oneway' },
+      // Above Building 4
+      { x: 1780, y: 968, w: 180, h: 32 },
 
       // ============================================================
-      // TOP LEVEL — sky platforms
+      // TOP LEVEL — antenna platforms y:768
+      // 100px above L4
       // ============================================================
-      { x: 256, y: 360, w: 128, h: 32 },
-      { x: 576, y: 340, w: 128, h: 32 },
-      { x: 896, y: 320, w: 128, h: 32 },
-      { x: 1216, y: 340, w: 128, h: 32 },
-      { x: 1536, y: 380, w: 128, h: 32 },
+      { x: 200, y: 768, w: 160, h: 32 },
+      { x: 500, y: 768, w: 160, h: 32 },
+      { x: 850, y: 768, w: 160, h: 32 },
+      { x: 1200, y: 768, w: 200, h: 32 },
+      { x: 1600, y: 768, w: 160, h: 32 },
+      { x: 1900, y: 768, w: 160, h: 32, type: 'oneway' },
 
       // ============================================================
       // TRAMPOLINES
       // ============================================================
-      { x: 160, y: 956, w: 64, h: 12, type: 'trampoline' },
-      { x: 720, y: 956, w: 64, h: 12, type: 'trampoline' },
-      { x: 1440, y: 956, w: 64, h: 12, type: 'trampoline' },
-      { x: 384, y: 748, w: 64, h: 12, type: 'trampoline' },
+      // Ground-level trampolines
+      { x: 100, y: 1256, w: 64, h: 12, type: 'trampoline' },
+      { x: 1050, y: 1256, w: 64, h: 12, type: 'trampoline' },
+      { x: 2000, y: 1256, w: 64, h: 12, type: 'trampoline' },
+
+      // Roof of Building 1 — launches to upper level
+      { x: 200, y: 1056, w: 64, h: 12, type: 'trampoline' },
+      // Roof of Building 3 — launches to top level
+      { x: 1280, y: 856, w: 64, h: 12, type: 'trampoline' },
 
       // ============================================================
-      // PILLARS for wall-jumping
+      // WALL-JUMP PILLARS
       // ============================================================
-      { x: 448, y: 844, w: 32, h: 124 },
-      { x: 1000, y: 780, w: 32, h: 188 },
+      { x: 540, y: 1068, w: 32, h: 200 },
+      { x: 1680, y: 968, w: 32, h: 300 },
 
       // ============================================================
       // BOUNDARY WALLS
       // ============================================================
-      { x: 0, y: 0, w: 20, h: 1000 },
-      { x: 1780, y: 0, w: 20, h: 1000 },
+      { x: 0, y: 0, w: 20, h: 1300 },
+      { x: 2180, y: 0, w: 20, h: 1300 },
     ],
     spawns: [
-      { x: 80, y: 928 }, { x: 280, y: 928 }, { x: 480, y: 928 },
-      { x: 700, y: 928 }, { x: 960, y: 928 }, { x: 1200, y: 928 },
-      { x: 1440, y: 928 }, { x: 1680, y: 928 },
+      { x: 100, y: 1228 }, { x: 350, y: 1228 }, { x: 600, y: 1228 },
+      { x: 880, y: 1228 }, { x: 1100, y: 1228 }, { x: 1400, y: 1228 },
+      { x: 1700, y: 1228 }, { x: 1950, y: 1228 },
     ],
   },
 
   sunset_park: {
     name: 'Sunset Park',
-    width: 1600,
-    height: 900,
+    width: 2000,
+    height: 1200,
     bg: '#FF9A76',
     theme: 'sunset',
     platforms: [
       // ============================================================
-      // FLOOR — continuous
+      // GROUND — continuous, y = 1168
       // ============================================================
-      { x: 0, y: 868, w: 1600, h: 32 },
+      { x: 0, y: 1168, w: 2000, h: 32 },
 
       // ============================================================
-      // LEFT STRUCTURE — wide low structure (x: 32–480)
-      // Horizontal flow emphasis — long rooms, short walls
+      // GROUND SPEED PADS — race track feel (3 segments)
       // ============================================================
-      // Structure floor
-      { x: 32, y: 740, w: 448, h: 32 },
+      { x: 40, y: 1136, w: 400, h: 32, type: 'dash_block' },
+      { x: 800, y: 1136, w: 400, h: 32, type: 'dash_block' },
+      { x: 1560, y: 1136, w: 400, h: 32, type: 'dash_block' },
+
+      // ============================================================
+      // AREA 1 — LEFT PAVILION (x: 40–600)
+      // Open structure with multiple levels, loop-friendly
+      // ============================================================
+
+      // -- L1 floor (y:1068, 100px above ground) --
+      { x: 40, y: 1068, w: 280, h: 32 },
+      { x: 400, y: 1068, w: 200, h: 32 },
+      // Jumpthrough bridge between L1 sections
+      { x: 280, y: 1068, w: 160, h: 32, type: 'jumpthrough' },
       // Left wall
-      { x: 32, y: 612, w: 32, h: 128 },
-      // Interior divider wall (short, 96px, creates two sub-rooms)
-      { x: 256, y: 644, w: 32, h: 96 },
-      // Right wall — partial (gap at bottom)
-      { x: 448, y: 612, w: 32, h: 64 },
-      // Ceiling
-      { x: 32, y: 612, w: 448, h: 32 },
-      // Jumpthrough in left sub-room
-      { x: 64, y: 676, w: 192, h: 32, type: 'jumpthrough' },
-      // Speed pad connecting across structure floor
-      { x: 64, y: 708, w: 384, h: 32, type: 'dash_block' },
+      { x: 40, y: 968, w: 32, h: 100 },
+      // Staircase step from ground to L1
+      { x: 40, y: 1118, w: 100, h: 32 },
+
+      // -- L2 floor (y:968) --
+      { x: 40, y: 968, w: 200, h: 32 },
+      { x: 340, y: 968, w: 260, h: 32 },
+      // Crumble bridge between L2 sections
+      { x: 200, y: 968, w: 100, h: 32, type: 'crumble' },
+
+      // -- L3 (y:868) — pavilion roof --
+      { x: 100, y: 868, w: 300, h: 32 },
+      { x: 460, y: 868, w: 140, h: 32, type: 'oneway' },
+
+      // -- Interior features --
+      // Trampoline on L1 floor — launches through jumpthrough area
+      { x: 320, y: 1056, w: 64, h: 12, type: 'trampoline' },
+      // Wall-jump pillar inside pavilion
+      { x: 260, y: 968, w: 32, h: 100 },
 
       // ============================================================
-      // LEFT-TO-CENTER LINK (x: 480–672)
-      // Low horizontal corridor
+      // CORRIDOR 1→2 (x: 600–780)
+      // Ground-level connecting path with overhead cover
       // ============================================================
-      // Corridor floor
-      { x: 480, y: 740, w: 192, h: 32 },
-      // Corridor ceiling (creates enclosed hallway feel)
-      { x: 480, y: 644, w: 192, h: 32 },
-      // Speed pad on ground between structures
-      { x: 448, y: 836, w: 320, h: 32, type: 'dash_block' },
+      // L1 overhead cover
+      { x: 600, y: 1068, w: 180, h: 32 },
+      // Stepping stone mid-corridor
+      { x: 640, y: 968, w: 120, h: 32 },
 
       // ============================================================
-      // CENTER STRUCTURE — hub room (x: 640–1024)
-      // Wider room, multiple entries, vertical escape via jumpthrough
+      // AREA 2 — CENTER HUB (x: 740–1280)
+      // Largest area — vertical tower with surrounding platforms
+      // Loop: left side up, across top, right side down
       // ============================================================
-      // Room floor
-      { x: 640, y: 740, w: 384, h: 32 },
-      // Left wall — gap at bottom
-      { x: 640, y: 548, w: 32, h: 128 },
-      // Right wall — gap at bottom
-      { x: 992, y: 548, w: 32, h: 128 },
-      // Ceiling
-      { x: 640, y: 548, w: 384, h: 32 },
-      // Jumpthrough mid-level (escape route upward)
-      { x: 704, y: 644, w: 256, h: 32, type: 'jumpthrough' },
-      // Interior shelf
-      { x: 672, y: 580, w: 128, h: 32 },
-      { x: 864, y: 580, w: 128, h: 32 },
+
+      // -- L1 floor (y:1068) --
+      { x: 740, y: 1068, w: 540, h: 32 },
+
+      // -- L2 (y:968) -- two platforms with gap --
+      { x: 740, y: 968, w: 200, h: 32 },
+      { x: 1060, y: 968, w: 220, h: 32 },
+      // Jumpthrough spanning the gap
+      { x: 900, y: 968, w: 200, h: 32, type: 'jumpthrough' },
+
+      // -- L3 (y:868) -- wide crossing --
+      { x: 780, y: 868, w: 460, h: 32 },
+      // Walls creating an open room
+      { x: 780, y: 768, w: 32, h: 100 },
+      { x: 1208, y: 768, w: 32, h: 100 },
+
+      // -- L4 (y:768) -- room ceiling --
+      { x: 780, y: 768, w: 460, h: 32 },
+
+      // -- L5 (y:668) -- top of hub --
+      { x: 860, y: 668, w: 300, h: 32 },
+
+      // -- Speed pad on L3 --
+      { x: 820, y: 836, w: 380, h: 32, type: 'dash_block' },
+
+      // -- Left staircase up hub (outside left wall) --
+      { x: 680, y: 1068, w: 100, h: 32 },
+      { x: 680, y: 968, w: 100, h: 32 },
+      { x: 680, y: 868, w: 100, h: 32 },
+
+      // -- Right staircase down hub --
+      { x: 1240, y: 968, w: 100, h: 32 },
+      { x: 1280, y: 868, w: 100, h: 32 },
+      { x: 1240, y: 768, w: 100, h: 32 },
+
+      // -- Trampolines in hub --
+      // On L1 floor, launches through L2 jumpthrough
+      { x: 960, y: 1056, w: 64, h: 12, type: 'trampoline' },
+      // On L3 floor, launches toward L5
+      { x: 980, y: 856, w: 64, h: 12, type: 'trampoline' },
 
       // ============================================================
-      // CENTER-TO-RIGHT LINK (x: 1024–1184)
+      // CORRIDOR 2→3 (x: 1280–1440)
       // ============================================================
-      // Corridor floor
-      { x: 1024, y: 740, w: 160, h: 32 },
-      // Crumble bridge at upper level
-      { x: 1024, y: 612, w: 128, h: 32, type: 'crumble' },
-      // Speed pad on ground between structures
-      { x: 992, y: 836, w: 320, h: 32, type: 'dash_block' },
+      // L1 level bridge
+      { x: 1280, y: 1068, w: 160, h: 32 },
+      // Crumble at L2 level
+      { x: 1300, y: 968, w: 120, h: 32, type: 'crumble' },
 
       // ============================================================
-      // RIGHT STRUCTURE — tall narrow structure (x: 1152–1568)
-      // Two-story room
+      // AREA 3 — RIGHT GARDENS (x: 1400–1960)
+      // Alternating levels with jumpthroughs for vertical flexibility
       // ============================================================
-      // Lower room floor
-      { x: 1152, y: 740, w: 416, h: 32 },
-      // Left wall
-      { x: 1152, y: 548, w: 32, h: 192 },
+
+      // -- L1 (y:1068) --
+      { x: 1400, y: 1068, w: 560, h: 32 },
+      // Step from ground
+      { x: 1900, y: 1118, w: 100, h: 32 },
+
+      // -- L2 (y:968) --
+      { x: 1440, y: 968, w: 240, h: 32 },
+      { x: 1760, y: 968, w: 200, h: 32 },
+      // Jumpthrough connecting
+      { x: 1640, y: 968, w: 160, h: 32, type: 'jumpthrough' },
+
+      // -- L3 (y:868) --
+      { x: 1500, y: 868, w: 300, h: 32 },
+      { x: 1860, y: 868, w: 100, h: 32, type: 'oneway' },
       // Right wall
-      { x: 1536, y: 612, w: 32, h: 128 },
-      // Mid floor (divides into two stories)
-      { x: 1152, y: 612, w: 416, h: 32 },
-      // Upper right wall
-      { x: 1536, y: 452, w: 32, h: 160 },
-      // Upper ceiling
-      { x: 1184, y: 452, w: 384, h: 32 },
-      // Jumpthrough in lower story
-      { x: 1216, y: 676, w: 256, h: 32, type: 'jumpthrough' },
-      // Jumpthrough in upper story
-      { x: 1216, y: 516, w: 256, h: 32, type: 'jumpthrough' },
-      // Interior pillar for wall-jump
-      { x: 1376, y: 548, w: 32, h: 64 },
+      { x: 1928, y: 868, w: 32, h: 100 },
+
+      // -- L4 (y:768) --
+      { x: 1560, y: 768, w: 200, h: 32 },
+      // Crumble bridge to right
+      { x: 1820, y: 768, w: 100, h: 32, type: 'crumble' },
+
+      // -- L5 (y:668) --
+      { x: 1600, y: 668, w: 160, h: 32 },
+
+      // -- Trampoline on L1 launches through L2 jumpthrough --
+      { x: 1700, y: 1056, w: 64, h: 12, type: 'trampoline' },
+
+      // -- Interior pillar for wall-jump --
+      { x: 1700, y: 868, w: 32, h: 100 },
 
       // ============================================================
-      // UPPER LEVEL — stepping stones above structures
-      // More horizontal than vertical
+      // UPPER LOOP CONNECTIONS — connect all three areas at top
       // ============================================================
-      { x: 64, y: 484, w: 160, h: 32 },
-      { x: 288, y: 484, w: 128, h: 32, type: 'oneway' },
-      { x: 480, y: 452, w: 128, h: 32 },
-      { x: 704, y: 420, w: 128, h: 32, type: 'oneway' },
-      { x: 928, y: 452, w: 128, h: 32 },
+      // Left to center (L4-L5 level)
+      { x: 500, y: 768, w: 160, h: 32 },
+      { x: 500, y: 668, w: 160, h: 32, type: 'oneway' },
+
+      // Center to right (L5 level)
+      { x: 1200, y: 668, w: 160, h: 32 },
+      { x: 1400, y: 668, w: 120, h: 32, type: 'oneway' },
 
       // ============================================================
-      // TOP LEVEL
+      // GROUND TRAMPOLINES
       // ============================================================
-      { x: 192, y: 356, w: 128, h: 32 },
-      { x: 448, y: 324, w: 128, h: 32 },
-      { x: 736, y: 292, w: 128, h: 32 },
-      { x: 1024, y: 324, w: 128, h: 32 },
-      { x: 1312, y: 356, w: 128, h: 32 },
+      { x: 150, y: 1156, w: 64, h: 12, type: 'trampoline' },
+      { x: 600, y: 1156, w: 64, h: 12, type: 'trampoline' },
+      { x: 1450, y: 1156, w: 64, h: 12, type: 'trampoline' },
+      { x: 1880, y: 1156, w: 64, h: 12, type: 'trampoline' },
 
       // ============================================================
-      // GROUND FEATURES
+      // WALL-JUMP PILLARS
       // ============================================================
-      // Trampolines
-      { x: 96, y: 856, w: 64, h: 12, type: 'trampoline' },
-      { x: 768, y: 856, w: 64, h: 12, type: 'trampoline' },
-      { x: 1472, y: 856, w: 64, h: 12, type: 'trampoline' },
-      // Trampoline inside center room
-      { x: 800, y: 728, w: 64, h: 12, type: 'trampoline' },
+      { x: 620, y: 1068, w: 32, h: 200 },
+      { x: 1360, y: 868, w: 32, h: 300 },
 
       // ============================================================
       // BOUNDARY WALLS
       // ============================================================
-      { x: 0, y: 0, w: 20, h: 900 },
-      { x: 1580, y: 0, w: 20, h: 900 },
+      { x: 0, y: 0, w: 20, h: 1200 },
+      { x: 1980, y: 0, w: 20, h: 1200 },
     ],
     spawns: [
-      { x: 80, y: 828 }, { x: 240, y: 828 }, { x: 440, y: 828 },
-      { x: 640, y: 828 }, { x: 860, y: 828 }, { x: 1080, y: 828 },
-      { x: 1300, y: 828 }, { x: 1480, y: 828 },
+      { x: 100, y: 1128 }, { x: 300, y: 1128 }, { x: 550, y: 1128 },
+      { x: 780, y: 1128 }, { x: 1000, y: 1128 }, { x: 1300, y: 1128 },
+      { x: 1600, y: 1128 }, { x: 1850, y: 1128 },
     ],
   },
 
   factory: {
     name: 'Factory',
-    width: 2000,
-    height: 1100,
+    width: 2400,
+    height: 1400,
     bg: '#2C1810',
     theme: 'factory',
     platforms: [
       // ============================================================
-      // FLOOR — continuous
+      // GROUND — continuous, y = 1368
       // ============================================================
-      { x: 0, y: 1068, w: 2000, h: 32 },
+      { x: 0, y: 1368, w: 2400, h: 32 },
 
       // ============================================================
-      // STRUCTURE 1 — left intake room (x: 32–352)
-      // U-shape with pillar inside
+      // GROUND SPEED PADS — conveyor belts
       // ============================================================
-      // Floor
-      { x: 32, y: 908, w: 320, h: 32 },
+      { x: 40, y: 1336, w: 400, h: 32, type: 'dash_block' },
+      { x: 1000, y: 1336, w: 400, h: 32, type: 'dash_block' },
+      { x: 1960, y: 1336, w: 400, h: 32, type: 'dash_block' },
+
+      // ============================================================
+      // ZONE 1 — LEFT INTAKE (x: 40–520)
+      // U-shaped intake bay with internal floors
+      // ============================================================
+
+      // -- L1 (y:1268, 100px above ground) --
+      { x: 40, y: 1268, w: 480, h: 32 },
       // Left wall
-      { x: 32, y: 716, w: 32, h: 192 },
-      // Right wall — gap at bottom (64px entry)
-      { x: 320, y: 716, w: 32, h: 128 },
-      // Ceiling
-      { x: 32, y: 716, w: 320, h: 32 },
-      // Interior pillar (wall-jump)
-      { x: 176, y: 780, w: 32, h: 128 },
-      // Jumpthrough
-      { x: 64, y: 812, w: 256, h: 32, type: 'jumpthrough' },
-      // Speed pad on structure floor
-      { x: 64, y: 876, w: 256, h: 32, type: 'dash_block' },
+      { x: 40, y: 1068, w: 32, h: 200 },
+      // Right wall — gap at bottom for entry
+      { x: 488, y: 1068, w: 32, h: 120 },
+      // Step from ground to L1
+      { x: 40, y: 1318, w: 100, h: 32 },
+
+      // -- L2 (y:1168) --
+      { x: 72, y: 1168, w: 416, h: 32 },
+      // Jumpthrough at L1.5 for flexibility
+      { x: 100, y: 1218, w: 300, h: 32, type: 'jumpthrough' },
+
+      // -- L3 (y:1068) — roof --
+      { x: 40, y: 1068, w: 480, h: 32 },
+
+      // -- Speed pad on L2 --
+      { x: 100, y: 1136, w: 360, h: 32, type: 'dash_block' },
+
+      // -- Interior pillar for wall-jump --
+      { x: 260, y: 1168, w: 32, h: 100 },
+
+      // -- Trampoline on L1, launches through jumpthrough to L2 --
+      { x: 180, y: 1256, w: 64, h: 12, type: 'trampoline' },
 
       // ============================================================
-      // CORRIDOR 1→2 (x: 352–576)
+      // ESCAPE SHAFT 1 (x: 480–580)
+      // Vertical shaft with jumpthrough — trampoline launch
       // ============================================================
-      // Corridor floor
-      { x: 352, y: 908, w: 224, h: 32 },
-      // Corridor ceiling
-      { x: 352, y: 812, w: 224, h: 32 },
-      // Crumble shortcut above
-      { x: 384, y: 716, w: 128, h: 32, type: 'crumble' },
+      // Jumpthrough above intake roof
+      { x: 480, y: 968, w: 120, h: 32, type: 'jumpthrough' },
+      // Trampoline on intake roof
+      { x: 500, y: 1056, w: 64, h: 12, type: 'trampoline' },
 
       // ============================================================
-      // STRUCTURE 2 — processing room (x: 544–928)
-      // Large room, two entries on each side
+      // ZONE 2 — PROCESSING HALL (x: 520–1000)
+      // Wide room, multiple stories, central pillar
       // ============================================================
-      // Floor
-      { x: 544, y: 908, w: 384, h: 32 },
-      // Left wall — lower portion only (gap at top for upper entry)
-      { x: 544, y: 812, w: 32, h: 96 },
-      // Right wall — lower portion only
-      { x: 896, y: 812, w: 32, h: 96 },
-      // Upper left wall
-      { x: 544, y: 620, w: 32, h: 128 },
-      // Upper right wall
-      { x: 896, y: 620, w: 32, h: 128 },
-      // Ceiling
-      { x: 544, y: 620, w: 384, h: 32 },
-      // Mid-level platform (creates two stories)
-      { x: 608, y: 748, w: 256, h: 32 },
-      // Jumpthrough in lower level
-      { x: 576, y: 844, w: 320, h: 32, type: 'jumpthrough' },
-      // Jumpthrough in upper level
-      { x: 608, y: 684, w: 256, h: 32, type: 'jumpthrough' },
-      // Interior pillar
-      { x: 736, y: 748, w: 32, h: 160 },
 
-      // ============================================================
-      // CORRIDOR 2→3 (x: 928–1120)
-      // Open corridor with speed pad on ground
-      // ============================================================
-      { x: 928, y: 908, w: 192, h: 32 },
-      // Speed pad on ground between structures
-      { x: 864, y: 1036, w: 352, h: 32, type: 'dash_block' },
+      // -- L1 (y:1268) --
+      { x: 520, y: 1268, w: 480, h: 32 },
 
-      // ============================================================
-      // STRUCTURE 3 — central tower (x: 1088–1408)
-      // Tallest structure, multiple levels
-      // ============================================================
-      // Base floor
-      { x: 1088, y: 908, w: 320, h: 32 },
+      // -- L2 (y:1168) --
+      { x: 560, y: 1168, w: 200, h: 32 },
+      { x: 840, y: 1168, w: 160, h: 32 },
+      // Jumpthrough connecting L2 sections
+      { x: 720, y: 1168, w: 160, h: 32, type: 'jumpthrough' },
+
+      // -- L3 (y:1068) --
+      { x: 520, y: 1068, w: 480, h: 32 },
       // Left wall
-      { x: 1088, y: 524, w: 32, h: 384 },
-      // Right wall — gap in middle (780-844 is open, 64px gap)
-      { x: 1376, y: 524, w: 32, h: 192 },
-      { x: 1376, y: 844, w: 32, h: 64 },
-      // Ceiling
-      { x: 1088, y: 524, w: 320, h: 32 },
-      // Level 1 floor
-      { x: 1120, y: 812, w: 256, h: 32 },
-      // Level 2 floor
-      { x: 1120, y: 716, w: 256, h: 32 },
-      // Level 3 floor (jumpthrough for escape)
-      { x: 1120, y: 620, w: 256, h: 32, type: 'jumpthrough' },
-      // Pillar in tower
-      { x: 1248, y: 620, w: 32, h: 192 },
-      // Speed pad on top of tower
-      { x: 1120, y: 492, w: 256, h: 32, type: 'dash_block' },
+      { x: 520, y: 1068, w: 32, h: 200 },
+      // Right wall — gap for entry
+      { x: 968, y: 1068, w: 32, h: 100 },
+
+      // -- L4 (y:968) — roof --
+      { x: 560, y: 968, w: 400, h: 32 },
+
+      // -- Central pillar --
+      { x: 740, y: 1068, w: 32, h: 200 },
+
+      // -- Jumpthrough escape from L3 to L4 --
+      { x: 600, y: 1018, w: 240, h: 32, type: 'jumpthrough' },
+
+      // -- Trampoline on L1 --
+      { x: 750, y: 1256, w: 64, h: 12, type: 'trampoline' },
+
+      // -- Speed pad on L3 --
+      { x: 560, y: 1036, w: 380, h: 32, type: 'dash_block' },
 
       // ============================================================
-      // CORRIDOR 3→4 (x: 1408–1568)
+      // CORRIDOR 2→3 (x: 1000–1200)
+      // Multi-level corridor
       // ============================================================
-      // Bridge
-      { x: 1408, y: 812, w: 160, h: 32 },
-      // Crumble at upper level
-      { x: 1408, y: 620, w: 128, h: 32, type: 'crumble' },
-      // Support wall
-      { x: 1408, y: 812, w: 32, h: 96 },
+      // L1 floor
+      { x: 1000, y: 1268, w: 200, h: 32 },
+      // L3 bridge
+      { x: 1000, y: 1068, w: 200, h: 32 },
+      // Crumble at L2 level
+      { x: 1020, y: 1168, w: 120, h: 32, type: 'crumble' },
+      // L4 stepping stone
+      { x: 1040, y: 968, w: 120, h: 32, type: 'oneway' },
 
       // ============================================================
-      // STRUCTURE 4 — right processing bay (x: 1536–1856)
-      // L-shaped structure
+      // ZONE 3 — CENTRAL TOWER (x: 1160–1560)
+      // Tallest structure, many levels, escape shafts
       // ============================================================
-      // Lower floor
-      { x: 1536, y: 908, w: 320, h: 32 },
-      // Left wall — partial
-      { x: 1536, y: 716, w: 32, h: 128 },
-      // Right wall
-      { x: 1824, y: 620, w: 32, h: 288 },
-      // Upper floor
-      { x: 1536, y: 716, w: 320, h: 32 },
-      // L-extension ceiling
-      { x: 1632, y: 620, w: 224, h: 32 },
+
+      // -- L1 (y:1268) --
+      { x: 1160, y: 1268, w: 400, h: 32 },
+
+      // -- L2 (y:1168) --
+      { x: 1200, y: 1168, w: 320, h: 32 },
+
+      // -- L3 (y:1068) --
+      { x: 1160, y: 1068, w: 400, h: 32 },
+
+      // -- L4 (y:968) --
+      { x: 1200, y: 968, w: 320, h: 32 },
+
+      // -- L5 (y:868) — tower top --
+      { x: 1160, y: 868, w: 400, h: 32 },
+
+      // -- Walls --
+      // Left wall (full height)
+      { x: 1160, y: 868, w: 32, h: 400 },
+      // Right wall — gaps for entries at L1 and L3
+      { x: 1528, y: 868, w: 32, h: 140 },
+      { x: 1528, y: 1108, w: 32, h: 60 },
+      { x: 1528, y: 1228, w: 32, h: 40 },
+
+      // -- Jumpthroughs for vertical escape --
+      { x: 1220, y: 1118, w: 280, h: 32, type: 'jumpthrough' },
+      { x: 1220, y: 918, w: 280, h: 32, type: 'jumpthrough' },
+
+      // -- Interior pillar --
+      { x: 1360, y: 1068, w: 32, h: 200 },
+
+      // -- Speed pad on top --
+      { x: 1200, y: 836, w: 320, h: 32, type: 'dash_block' },
+
+      // -- Trampolines --
+      // On L1, launches through L2 jumpthrough
+      { x: 1320, y: 1256, w: 64, h: 12, type: 'trampoline' },
+      // On L3, launches through L4 jumpthrough
+      { x: 1320, y: 1056, w: 64, h: 12, type: 'trampoline' },
+      // On L5 top, launches to upper platforms
+      { x: 1340, y: 856, w: 64, h: 12, type: 'trampoline' },
+
+      // ============================================================
+      // CORRIDOR 3→4 (x: 1560–1740)
+      // ============================================================
+      // L1 floor
+      { x: 1560, y: 1268, w: 180, h: 32 },
+      // L3 bridge
+      { x: 1560, y: 1068, w: 180, h: 32 },
+      // Crumble at L4
+      { x: 1580, y: 968, w: 120, h: 32, type: 'crumble' },
+
+      // ============================================================
+      // ZONE 4 — RIGHT ASSEMBLY BAY (x: 1700–2100)
+      // L-shaped structure, multiple entries
+      // ============================================================
+
+      // -- L1 (y:1268) --
+      { x: 1700, y: 1268, w: 400, h: 32 },
+      // Step from ground
+      { x: 2060, y: 1318, w: 100, h: 32 },
+
+      // -- L2 (y:1168) --
+      { x: 1740, y: 1168, w: 320, h: 32 },
       // Jumpthrough
-      { x: 1568, y: 812, w: 256, h: 32, type: 'jumpthrough' },
-      // Interior pillar
-      { x: 1696, y: 716, w: 32, h: 192 },
+      { x: 1760, y: 1218, w: 260, h: 32, type: 'jumpthrough' },
 
-      // ============================================================
-      // STRUCTURE 5 — far right storage (x: 1824–1968)
-      // Small enclosed room
-      // ============================================================
-      // Floor
-      { x: 1824, y: 908, w: 144, h: 32 },
+      // -- L3 (y:1068) --
+      { x: 1700, y: 1068, w: 400, h: 32 },
+      // Left wall
+      { x: 1700, y: 1068, w: 32, h: 200 },
       // Right wall
-      { x: 1936, y: 748, w: 32, h: 160 },
-      // Ceiling
-      { x: 1824, y: 748, w: 144, h: 32 },
-      // Speed pad inside
-      { x: 1824, y: 876, w: 144, h: 32, type: 'dash_block' },
+      { x: 2068, y: 968, w: 32, h: 300 },
+
+      // -- L4 (y:968) — upper floor --
+      { x: 1740, y: 968, w: 328, h: 32 },
+
+      // -- Speed pad on L2 --
+      { x: 1760, y: 1136, w: 280, h: 32, type: 'dash_block' },
+
+      // -- Interior pillar --
+      { x: 1900, y: 1068, w: 32, h: 200 },
+
+      // -- Trampoline on L1 --
+      { x: 1840, y: 1256, w: 64, h: 12, type: 'trampoline' },
+
+      // ============================================================
+      // ZONE 5 — FAR RIGHT STORAGE (x: 2100–2360)
+      // Small room, speed pad, escape options
+      // ============================================================
+
+      // -- L1 (y:1268) --
+      { x: 2100, y: 1268, w: 260, h: 32 },
+
+      // -- L2 (y:1168) --
+      { x: 2140, y: 1168, w: 180, h: 32 },
       // Jumpthrough
-      { x: 1824, y: 828, w: 112, h: 32, type: 'jumpthrough' },
+      { x: 2140, y: 1218, w: 180, h: 32, type: 'jumpthrough' },
+
+      // -- L3 (y:1068) — roof --
+      { x: 2100, y: 1068, w: 260, h: 32 },
+      // Right wall
+      { x: 2328, y: 1068, w: 32, h: 200 },
+
+      // -- Speed pad --
+      { x: 2140, y: 1136, w: 180, h: 32, type: 'dash_block' },
 
       // ============================================================
-      // UPPER LEVEL — catwalks above structures
+      // UPPER CATWALKS — above all structures
+      // Connected path across the top of the factory
       // ============================================================
-      { x: 96, y: 588, w: 160, h: 32 },
-      { x: 320, y: 556, w: 128, h: 32 },
-      { x: 512, y: 492, w: 128, h: 32, type: 'oneway' },
-      // Crumble catwalk
-      { x: 704, y: 524, w: 128, h: 32, type: 'crumble' },
-      { x: 928, y: 492, w: 128, h: 32 },
-      // Far right upper
-      { x: 1568, y: 524, w: 128, h: 32, type: 'oneway' },
-      { x: 1792, y: 556, w: 128, h: 32 },
+
+      // Above Zone 1 (L4 = y:968)
+      { x: 80, y: 968, w: 200, h: 32 },
+
+      // Stepping stone
+      { x: 360, y: 868, w: 140, h: 32 },
+
+      // Above corridor 2-3
+      { x: 1040, y: 868, w: 140, h: 32 },
+
+      // Above Zone 4
+      { x: 1740, y: 868, w: 200, h: 32 },
+
+      // Above Zone 5
+      { x: 2140, y: 968, w: 180, h: 32 },
 
       // ============================================================
-      // TOP LEVEL — overhead crane rails
+      // TOP LEVEL — crane rail platforms (y:768)
+      // 100px above L5
       // ============================================================
-      { x: 192, y: 396, w: 128, h: 32 },
-      { x: 448, y: 364, w: 128, h: 32 },
-      { x: 736, y: 332, w: 160, h: 32 },
-      { x: 1024, y: 364, w: 128, h: 32 },
-      { x: 1344, y: 396, w: 128, h: 32 },
-      { x: 1632, y: 364, w: 128, h: 32 },
-      { x: 1856, y: 396, w: 96, h: 32 },
+      { x: 160, y: 768, w: 160, h: 32 },
+      { x: 500, y: 768, w: 160, h: 32 },
+      { x: 840, y: 768, w: 160, h: 32 },
+      { x: 1160, y: 768, w: 200, h: 32 },
+      { x: 1560, y: 768, w: 160, h: 32 },
+      { x: 1900, y: 768, w: 160, h: 32 },
+      { x: 2200, y: 768, w: 160, h: 32, type: 'oneway' },
 
       // ============================================================
-      // GROUND LEVEL FEATURES
+      // GROUND TRAMPOLINES
       // ============================================================
-      // Speed pad on far left ground
-      { x: 32, y: 1036, w: 320, h: 32, type: 'dash_block' },
-      // Speed pad on far right ground
-      { x: 1632, y: 1036, w: 320, h: 32, type: 'dash_block' },
-      // Trampolines
-      { x: 160, y: 1056, w: 64, h: 12, type: 'trampoline' },
-      { x: 576, y: 1056, w: 64, h: 12, type: 'trampoline' },
-      { x: 1024, y: 1056, w: 64, h: 12, type: 'trampoline' },
-      { x: 1472, y: 1056, w: 64, h: 12, type: 'trampoline' },
-      { x: 1888, y: 1056, w: 64, h: 12, type: 'trampoline' },
-      // Trampoline inside structure 2
-      { x: 704, y: 896, w: 64, h: 12, type: 'trampoline' },
+      { x: 80, y: 1356, w: 64, h: 12, type: 'trampoline' },
+      { x: 600, y: 1356, w: 64, h: 12, type: 'trampoline' },
+      { x: 1100, y: 1356, w: 64, h: 12, type: 'trampoline' },
+      { x: 1650, y: 1356, w: 64, h: 12, type: 'trampoline' },
+      { x: 2200, y: 1356, w: 64, h: 12, type: 'trampoline' },
 
       // ============================================================
-      // PILLARS — standalone wall-jump pillars
+      // WALL-JUMP PILLARS — standalone
       // ============================================================
-      { x: 448, y: 908, w: 32, h: 160 },
-      { x: 1472, y: 812, w: 32, h: 256 },
+      { x: 480, y: 1168, w: 32, h: 200 },
+      { x: 1140, y: 968, w: 32, h: 300 },
+      { x: 1700, y: 868, w: 32, h: 200 },
+      { x: 2100, y: 1168, w: 32, h: 200 },
 
       // ============================================================
       // BOUNDARY WALLS
       // ============================================================
-      { x: 0, y: 0, w: 20, h: 1100 },
-      { x: 1980, y: 0, w: 20, h: 1100 },
+      { x: 0, y: 0, w: 20, h: 1400 },
+      { x: 2380, y: 0, w: 20, h: 1400 },
     ],
     spawns: [
-      { x: 80, y: 1028 }, { x: 320, y: 1028 }, { x: 580, y: 1028 },
-      { x: 820, y: 1028 }, { x: 1100, y: 1028 }, { x: 1400, y: 1028 },
-      { x: 1680, y: 1028 }, { x: 1900, y: 1028 },
+      { x: 100, y: 1328 }, { x: 380, y: 1328 }, { x: 660, y: 1328 },
+      { x: 940, y: 1328 }, { x: 1220, y: 1328 }, { x: 1500, y: 1328 },
+      { x: 1800, y: 1328 }, { x: 2100, y: 1328 },
     ],
   },
 };

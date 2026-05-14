@@ -9,7 +9,7 @@ import {
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
   MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
   DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
-  CRUMBLE_DELAY, CRUMBLE_GONE_TIME,
+  CRUMBLE_DELAY, CRUMBLE_GONE_TIME, SPEED_PAD_MULTIPLIER,
 } from '/shared/constants.js';
 import { C, S } from '/shared/protocol.js';
 
@@ -271,64 +271,79 @@ let practiceMode = false;
 
 const practiceMap = {
   name: 'Practice',
-  width: 1600,
-  height: 900,
+  width: 2000,
+  height: 1200,
   bg: '#7EC8E3',
   theme: 'sky',
   platforms: [
     // Floor
-    { x: 0, y: 868, w: 1600, h: 32 },
+    { x: 0, y: 1168, w: 2000, h: 32 },
+    // Ground speed pads
+    { x: 40, y: 1136, w: 380, h: 32, type: 'dash_block' },
+    { x: 1580, y: 1136, w: 380, h: 32, type: 'dash_block' },
 
-    // Left room — U-shape
-    { x: 32, y: 740, w: 352, h: 32 },
-    { x: 32, y: 580, w: 32, h: 160 },
-    { x: 352, y: 580, w: 32, h: 96 },
-    { x: 96, y: 644, w: 224, h: 32, type: 'jumpthrough' },
-    { x: 64, y: 580, w: 128, h: 32 },
+    // L1 (y=1068) — staircase entries + jumpthrough center
+    { x: 40, y: 1118, w: 128, h: 32 },
+    { x: 40, y: 1068, w: 200, h: 32 },
+    { x: 200, y: 1068, w: 400, h: 32 },
+    { x: 700, y: 1068, w: 300, h: 32, type: 'jumpthrough' },
+    { x: 1100, y: 1068, w: 500, h: 32 },
+    { x: 1760, y: 1068, w: 200, h: 32 },
+    { x: 1830, y: 1118, w: 128, h: 32 },
+    { x: 880, y: 1068, w: 120, h: 32, type: 'crumble', timer: 0, gone: false },
 
-    // Left-to-center corridor
-    { x: 384, y: 740, w: 256, h: 32 },
-    { x: 416, y: 644, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
-    { x: 480, y: 728, w: 64, h: 12, type: 'trampoline' },
+    // L2 (y=968)
+    { x: 40, y: 968, w: 300, h: 32 },
+    { x: 40, y: 968, w: 32, h: 100 },
+    { x: 440, y: 968, w: 250, h: 32 },
+    { x: 750, y: 968, w: 280, h: 32, type: 'jumpthrough' },
+    { x: 1100, y: 968, w: 250, h: 32 },
+    { x: 1500, y: 968, w: 300, h: 32 },
+    { x: 1768, y: 968, w: 32, h: 100 },
+    { x: 60, y: 936, w: 260, h: 32, type: 'dash_block' },
 
-    // Center room
-    { x: 608, y: 740, w: 416, h: 32 },
-    { x: 608, y: 548, w: 32, h: 128 },
-    { x: 992, y: 548, w: 32, h: 128 },
-    { x: 608, y: 548, w: 416, h: 32 },
-    { x: 672, y: 708, w: 320, h: 32, type: 'dash_block' },
-    { x: 672, y: 628, w: 288, h: 32, type: 'jumpthrough' },
+    // L3 (y=868)
+    { x: 80, y: 868, w: 200, h: 32 },
+    { x: 380, y: 868, w: 160, h: 32 },
+    { x: 640, y: 868, w: 400, h: 32 },
+    { x: 640, y: 768, w: 32, h: 100 },
+    { x: 1008, y: 768, w: 32, h: 100 },
+    { x: 1140, y: 868, w: 160, h: 32 },
+    { x: 1500, y: 868, w: 200, h: 32 },
+    { x: 340, y: 868, w: 80, h: 32, type: 'oneway' },
+    { x: 1360, y: 868, w: 80, h: 32, type: 'oneway' },
 
-    // Center-to-right corridor
-    { x: 1024, y: 740, w: 192, h: 32 },
-    { x: 1056, y: 580, w: 128, h: 32, type: 'crumble', timer: 0, gone: false },
+    // L4 (y=768)
+    { x: 120, y: 768, w: 220, h: 32 },
+    { x: 640, y: 768, w: 400, h: 32 },
+    { x: 1440, y: 768, w: 220, h: 32 },
+    { x: 420, y: 768, w: 120, h: 32, type: 'crumble', timer: 0, gone: false },
+    { x: 1140, y: 768, w: 120, h: 32, type: 'crumble', timer: 0, gone: false },
 
-    // Right room — L-shape
-    { x: 1184, y: 740, w: 384, h: 32 },
-    { x: 1536, y: 548, w: 32, h: 192 },
-    { x: 1312, y: 548, w: 256, h: 32 },
-    { x: 1312, y: 612, w: 32, h: 128 },
-    { x: 1216, y: 644, w: 224, h: 32, type: 'jumpthrough' },
+    // L5 (y=668)
+    { x: 200, y: 668, w: 200, h: 32 },
+    { x: 800, y: 668, w: 200, h: 32 },
+    { x: 1400, y: 668, w: 200, h: 32 },
+    { x: 500, y: 668, w: 100, h: 32, type: 'oneway' },
+    { x: 1200, y: 668, w: 100, h: 32, type: 'oneway' },
 
-    // Upper level
-    { x: 64, y: 452, w: 128, h: 32 },
-    { x: 256, y: 420, w: 96, h: 32 },
-    { x: 544, y: 420, w: 160, h: 32, type: 'oneway' },
-    { x: 784, y: 388, w: 96, h: 32 },
-    { x: 960, y: 420, w: 160, h: 32, type: 'oneway' },
-    { x: 1216, y: 420, w: 128, h: 32 },
-    { x: 1408, y: 388, w: 96, h: 32 },
+    // Trampolines
+    { x: 818, y: 1156, w: 64, h: 12, type: 'trampoline' },
+    { x: 500, y: 1156, w: 64, h: 12, type: 'trampoline' },
+    { x: 1436, y: 1156, w: 64, h: 12, type: 'trampoline' },
+    { x: 850, y: 1056, w: 64, h: 12, type: 'trampoline' },
+    { x: 870, y: 856, w: 64, h: 12, type: 'trampoline' },
+    { x: 250, y: 756, w: 64, h: 12, type: 'trampoline' },
 
-    // Ground features
-    { x: 64, y: 836, w: 320, h: 32, type: 'dash_block' },
-    { x: 1216, y: 836, w: 320, h: 32, type: 'dash_block' },
-    { x: 32, y: 856, w: 64, h: 12, type: 'trampoline' },
-    { x: 1504, y: 856, w: 64, h: 12, type: 'trampoline' },
-    { x: 768, y: 856, w: 64, h: 12, type: 'trampoline' },
+    // Pillars
+    { x: 460, y: 968, w: 32, h: 200 },
+    { x: 1380, y: 968, w: 32, h: 200 },
+    { x: 560, y: 768, w: 32, h: 200 },
+    { x: 1080, y: 768, w: 32, h: 200 },
 
     // Walls
-    { x: 0, y: 0, w: 20, h: 900 },
-    { x: 1580, y: 0, w: 20, h: 900 },
+    { x: 0, y: 0, w: 20, h: 1200 },
+    { x: 1980, y: 0, w: 20, h: 1200 },
   ],
 };
 
@@ -345,7 +360,7 @@ btnPractice.addEventListener('click', () => {
   }
 
   localPlayer = {
-    x: 400, y: 828,
+    x: 400, y: 1128,
     vx: 0, vy: 0,
     onGround: false, facingRight: true,
     jumpHeld: false, dashHeld: false,
@@ -617,7 +632,22 @@ function isPlatGone(plat, platIndex) {
 }
 
 function predictLocal(p, inp, platforms) {
-  const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
+  // Speed pad check
+  let speedMul = 1;
+  if (p.onGround) {
+    for (let i = 0; i < platforms.length; i++) {
+      const plat = platforms[i];
+      if (isPlatGone(plat, i)) continue;
+      if (plat.type === 'dash_block' &&
+          p.x + PLAYER_WIDTH > plat.x && p.x < plat.x + plat.w &&
+          Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
+        speedMul = SPEED_PAD_MULTIPLIER;
+        p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE * 4);
+        break;
+      }
+    }
+  }
+  const speed = MOVE_SPEED * speedMul * (p.isIt ? IT_SPEED_BOOST : 1);
 
   if (p.dashTicks <= 0) {
     p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE);

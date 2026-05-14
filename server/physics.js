@@ -3,7 +3,7 @@ import {
   PLAYER_WIDTH, PLAYER_HEIGHT, IT_SPEED_BOOST,
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
   MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
-  DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
+  DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION, SPEED_PAD_MULTIPLIER,
 } from '../shared/constants.js';
 
 const PASSTHROUGH_TYPES = new Set(['jumpthrough', 'oneway']);
@@ -11,27 +11,39 @@ const PASSTHROUGH_TYPES = new Set(['jumpthrough', 'oneway']);
 export function updatePlayer(p, platforms) {
   if (p.frozen) return;
 
-  const speed = MOVE_SPEED * (p.isIt ? IT_SPEED_BOOST : 1);
+  // Check if player is standing on a speed pad (from last tick's ground state)
+  let onSpeedPad = false;
+  if (p.onGround) {
+    for (const plat of platforms) {
+      if (plat.gone) continue;
+      if (plat.type === 'dash_block' &&
+          p.x + PLAYER_WIDTH > plat.x && p.x < plat.x + plat.w &&
+          Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
+        onSpeedPad = true;
+        p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE * 4); // faster charge on pad
+        break;
+      }
+    }
+  }
+
+  const speedMul = onSpeedPad ? SPEED_PAD_MULTIPLIER : 1;
+  const speed = MOVE_SPEED * speedMul * (p.isIt ? IT_SPEED_BOOST : 1);
 
   // --- Dash ---
-  // Charge when not dashing
   if (p.dashTicks <= 0) {
     p.dashCharge = Math.min(1, p.dashCharge + DASH_CHARGE_RATE);
   }
 
-  // Trigger dash
   if (p.input.dash && !p.dashHeld && p.dashCharge >= 1 && p.dashTicks <= 0) {
     p.dashTicks = DASH_DURATION;
     p.dashCharge = 0;
   }
   p.dashHeld = p.input.dash;
 
-  // During dash: override horizontal velocity
   if (p.dashTicks > 0) {
     p.dashTicks--;
     p.vx = p.facingRight ? DASH_SPEED : -DASH_SPEED;
   } else {
-    // Smooth horizontal movement with acceleration/friction
     let targetVx = 0;
     if (p.input.left) { targetVx = -speed; p.facingRight = false; }
     if (p.input.right) { targetVx = speed; p.facingRight = true; }
@@ -56,12 +68,10 @@ export function updatePlayer(p, platforms) {
       p.onGround = false;
     } else if (p.hasDoubleJump) {
       if (touchingWallLeft || touchingWallRight) {
-        // Wall jump
         p.vy = WALL_JUMP_FORCE_Y;
         p.vx = touchingWallLeft ? WALL_JUMP_FORCE_X : -WALL_JUMP_FORCE_X;
         p.facingRight = touchingWallLeft;
       } else {
-        // Air double jump
         p.vy = DOUBLE_JUMP_FORCE;
       }
       p.hasDoubleJump = false;
@@ -76,7 +86,7 @@ export function updatePlayer(p, platforms) {
   }
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
-  // --- Move X (skip passthrough and gone platforms) ---
+  // --- Move X ---
   moveAxis(p, platforms, p.vx);
 
   // --- Move Y (substep) ---
@@ -89,7 +99,6 @@ export function updatePlayer(p, platforms) {
       if (plat.gone) continue;
       if (overlaps(p, plat)) {
         if (stepVy > 0) {
-          // Falling — check passthrough: only land if coming from above
           if (PASSTHROUGH_TYPES.has(plat.type)) {
             const prevBottom = (p.y - stepVy) + PLAYER_HEIGHT;
             if (prevBottom > plat.y + 2) continue;
@@ -105,7 +114,6 @@ export function updatePlayer(p, platforms) {
           }
           p.onGround = true;
         } else {
-          // Rising — pass through passthrough and crumble-gone platforms
           if (PASSTHROUGH_TYPES.has(plat.type)) continue;
           p.y = plat.y + plat.h;
         }
@@ -116,7 +124,6 @@ export function updatePlayer(p, platforms) {
     }
   }
 
-  // Clamp to map top
   if (p.y < 0) { p.y = 0; p.vy = 0; }
 }
 
