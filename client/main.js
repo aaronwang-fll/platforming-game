@@ -594,41 +594,58 @@ btnEditorStop.addEventListener('click', () => {
   editorToolsEl.style.display = '';
 });
 
-let editorCodeVisible = false;
-let editorCodeMode = null; // 'save' or 'load'
+const editorCodePanel = document.getElementById('editor-code-panel');
+const btnCodeSubmit = document.getElementById('btn-code-submit');
+const btnCodeCopy = document.getElementById('btn-code-copy');
+const btnCodeClose = document.getElementById('btn-code-close');
+
+function showCodePanel(mode, content) {
+  editorCodeEl.value = content || '';
+  editorCodeEl.placeholder = mode === 'load' ? 'Paste level code here...' : '';
+  editorCodeEl.readOnly = mode === 'save';
+  btnCodeSubmit.style.display = mode === 'load' ? '' : 'none';
+  btnCodeCopy.style.display = mode === 'save' ? '' : 'none';
+  editorCodePanel.style.display = 'block';
+  if (mode === 'save') editorCodeEl.select();
+  else editorCodeEl.focus();
+}
+
+function hideCodePanel() {
+  editorCodePanel.style.display = 'none';
+}
 
 btnEditorSave.addEventListener('click', () => {
   if (!editor) return;
-  const code = editor.save();
-  editorCodeEl.value = code;
-  editorCodeEl.style.display = 'block';
-  editorCodeEl.select();
-  editorCodeMode = 'save';
-  editorCodeVisible = true;
+  showCodePanel('save', editor.save());
 });
 
 btnEditorLoad.addEventListener('click', () => {
   if (!editor) return;
-  if (editorCodeVisible && editorCodeMode === 'load') {
-    // Actually load
-    const code = editorCodeEl.value.trim();
-    if (code) {
-      const ok = editor.load(code);
-      if (!ok) alert('Invalid level code.');
-      else { editorColsInput.value = editor.cols; editorRowsInput.value = editor.rows; }
-    }
-    editorCodeEl.style.display = 'none';
-    editorCodeVisible = false;
-    editorCodeMode = null;
-  } else {
-    editorCodeEl.value = '';
-    editorCodeEl.style.display = 'block';
-    editorCodeEl.placeholder = 'Paste level code here, then click Load Code again...';
-    editorCodeEl.focus();
-    editorCodeMode = 'load';
-    editorCodeVisible = true;
-  }
+  showCodePanel('load', '');
 });
+
+btnCodeSubmit.addEventListener('click', () => {
+  if (!editor) return;
+  const code = editorCodeEl.value.trim();
+  if (code) {
+    const ok = editor.load(code);
+    if (!ok) { alert('Invalid level code.'); return; }
+    editorColsInput.value = editor.cols;
+    editorRowsInput.value = editor.rows;
+  }
+  hideCodePanel();
+});
+
+btnCodeCopy.addEventListener('click', () => {
+  editorCodeEl.select();
+  navigator.clipboard.writeText(editorCodeEl.value).catch(() => {
+    document.execCommand('copy');
+  });
+  btnCodeCopy.textContent = 'Copied!';
+  setTimeout(() => { btnCodeCopy.textContent = 'Copy'; }, 1500);
+});
+
+btnCodeClose.addEventListener('click', hideCodePanel);
 
 btnEditorClear.addEventListener('click', () => {
   if (!editor) return;
@@ -646,9 +663,7 @@ btnEditorExit.addEventListener('click', () => {
   editor = null;
   editorMode = false;
   editorUI.style.display = 'none';
-  editorCodeEl.style.display = 'none';
-  editorCodeVisible = false;
-  editorCodeMode = null;
+  hideCodePanel();
   btnEditorTest.style.display = '';
   btnEditorStop.style.display = 'none';
   editorToolsEl.style.display = '';

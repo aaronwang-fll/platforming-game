@@ -119,7 +119,14 @@
         <button class="editor-btn editor-btn-exit" id="btn-editor-exit">Exit</button>
       </div>
     </div>
-    <textarea id="editor-code" placeholder="Paste level code here..." style="display:none;"></textarea>
+    <div id="editor-code-panel" style="display:none;">
+      <textarea id="editor-code" placeholder="Paste level code here..."></textarea>
+      <div class="editor-code-btns">
+        <button class="editor-btn" id="btn-code-submit">Load</button>
+        <button class="editor-btn" id="btn-code-copy">Copy</button>
+        <button class="editor-btn" id="btn-code-close">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- In-game overlay buttons -->
