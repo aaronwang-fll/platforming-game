@@ -275,17 +275,9 @@ function moveAxis(p, platforms, vx) {
   p.x += vx;
   for (const plat of platforms) {
     if (plat.gone) continue;
+    if (plat.type === 'trampoline') continue; // trampolines have no horizontal collision
     if (skipHorizontalCollision(plat, vx)) continue;
     if (overlaps(p, plat)) {
-      // Walking into any trampoline from the side = diagonal launch
-      if (plat.type === 'trampoline') {
-        if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
-        else if (vx < 0) p.x = plat.x + plat.w;
-        p.vy = TRAMPOLINE_FORCE; // launch upward
-        p.hasDoubleJump = true;
-        p.bounceTicks = BOUNCE_AIR_TICKS;
-        return;
-      }
       if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (vx < 0) p.x = plat.x + plat.w;
       p.vx = 0;
@@ -306,6 +298,7 @@ function isTouchingWall(p, platforms, dir) {
   const testX = p.x + dir;
   for (const plat of platforms) {
     if (plat.gone) continue;
+    if (plat.type === 'trampoline') continue; // trampolines are not walls
     if (isPassthrough(plat)) {
       const pd = getPassDir(plat);
       // Only skip wall detection for passDir 0 and 2 (no horizontal collision)

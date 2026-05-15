@@ -131,6 +131,24 @@ export class Editor {
 
   _handleMouseDown(e) {
     if (this.testing) return;
+
+    // Check direction toggle click
+    if (e.button === 0 && this._dirToggleRect && ROTATABLE.has(this.tool)) {
+      const s = this._getCanvasScale();
+      const mx = (e.clientX - s.left) * s.scaleX;
+      const my = (e.clientY - s.top) * s.scaleY;
+      const r = this._dirToggleRect;
+      if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
+        // Left half = previous rotation, right half = next rotation
+        if (mx < r.x + r.w / 2) {
+          this.rotation = (this.rotation + 3) & 3;
+        } else {
+          this.rotation = (this.rotation + 1) & 3;
+        }
+        return;
+      }
+    }
+
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
     if (e.button === 2) {
       // Right-click drag = pan camera
@@ -441,15 +459,43 @@ export class Editor {
     ctx.fillText(`${this.cols}x${this.rows}`, CANVAS_WIDTH / 2, 23);
     ctx.textAlign = 'right';
     const block = BLOCK_TYPES[this.tool];
-    let toolInfo = `Tool: ${block.name}`;
-    if (ROTATABLE.has(this.tool)) {
-      const dirNames = this.tool === 7
-        ? ['Push \u2192', 'Push \u2193', 'Push \u2190', 'Push \u2191']
-        : ['Bounce \u2191', 'Bounce \u2190', 'Bounce \u2193', 'Bounce \u2192'];
-      toolInfo += ` [R: ${dirNames[this.rotation]}]`;
-    }
-    ctx.fillText(toolInfo, CANVAS_WIDTH - 20, 23);
+    ctx.fillText(`Tool: ${block.name}`, CANVAS_WIDTH - 20, 23);
     ctx.textAlign = 'left';
+
+    // Direction toggle for rotatable tools — shown below the HUD bar
+    if (ROTATABLE.has(this.tool)) {
+      const isConveyor = this.tool === 7;
+      const isVert = this.rotation === 1 || this.rotation === 3;
+      const label = isConveyor
+        ? (isVert ? (this.rotation === 3 ? '\u2191 Up' : '\u2193 Down') : (this.rotation === 0 ? '\u2192 Right' : '\u2190 Left'))
+        : (isVert ? (this.rotation === 1 ? '\u2190 Left' : '\u2192 Right') : (this.rotation === 0 ? '\u2191 Up' : '\u2193 Down'));
+
+      const bw = 120, bh = 22;
+      const bx = CANVAS_WIDTH / 2 - bw / 2;
+      const by = 36;
+      // Background
+      ctx.fillStyle = 'rgba(20,20,40,0.8)';
+      ctx.fillRect(bx, by, bw, bh);
+      // Left arrow
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u25C0', bx + 14, by + 16);
+      // Direction label
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(label, CANVAS_WIDTH / 2, by + 16);
+      // Right arrow
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('\u25B6', bx + bw - 14, by + 16);
+      ctx.textAlign = 'left';
+
+      // Store toggle hit area for click detection
+      this._dirToggleRect = { x: bx, y: by, w: bw, h: bh };
+    } else {
+      this._dirToggleRect = null;
+    }
   }
 
   toMap() {

@@ -892,6 +892,7 @@ function isTouchingWall(p, platforms, dir) {
   const testX = p.x + dir;
   for (const plat of platforms) {
     if (plat.gone) continue;
+    if (plat.type === 'trampoline') continue;
     if (isPassthrough(plat)) {
       const pd = getPassDir(plat);
       if (pd === 0 || pd === 2) continue;
@@ -1044,6 +1045,7 @@ function predictLocal(p, inp, platforms) {
   for (let i = 0; i < platforms.length; i++) {
     const plat = platforms[i];
     if (isPlatGone(plat, i)) continue;
+    if (plat.type === 'trampoline') continue; // trampolines have no horizontal collision
     // Skip horizontal collision for passthrough based on passDir
     if (isPassthrough(plat)) {
       const pd = getPassDir(plat);
@@ -1052,15 +1054,6 @@ function predictLocal(p, inp, platforms) {
       if (pd === 3 && p.vx < 0) continue;
     }
     if (overlaps(p, plat)) {
-      // Walking into any trampoline from the side = diagonal launch
-      if (plat.type === 'trampoline') {
-        if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
-        else if (p.vx < 0) p.x = plat.x + plat.w;
-        p.vy = TRAMPOLINE_FORCE; // launch upward
-        p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
-        p.bounceTicks = BOUNCE_AIR_TICKS;
-        return;
-      }
       if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (p.vx < 0) p.x = plat.x + plat.w;
       p.vx = 0;
