@@ -30,7 +30,7 @@ export const DOUBLE_JUMP_FORCE = -9;
 export const TRAMPOLINE_FORCE = -14;
 
 // Speed pad — actual velocity boost while standing on it
-export const SPEED_PAD_MULTIPLIER = 2.2;
+export const SPEED_PAD_MULTIPLIER = 3.0;
 
 // Conveyor belt
 export const CONVEYOR_SPEED = 3;
@@ -38,6 +38,9 @@ export const CONVEYOR_SPEED = 3;
 // Crumble blocks
 export const CRUMBLE_DELAY = 12;
 export const CRUMBLE_GONE_TIME = 180;
+
+// Bounce air control reduction
+export const BOUNCE_AIR_TICKS = 15;
 
 // Dash
 export const DASH_CHARGE_RATE = 1 / (5 * 60);

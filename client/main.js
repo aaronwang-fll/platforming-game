@@ -12,7 +12,7 @@ import {
   MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
   DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION,
   CRUMBLE_DELAY, CRUMBLE_GONE_TIME, SPEED_PAD_MULTIPLIER,
-  CONVEYOR_SPEED,
+  CONVEYOR_SPEED, BOUNCE_AIR_TICKS,
 } from '/shared/constants.js';
 import { C, S } from '/shared/protocol.js';
 
@@ -381,6 +381,7 @@ btnPractice.addEventListener('click', () => {
     isIt: false, frozen: false,
     hasDoubleJump: doubleJumpEnabled,
     dashCharge: 1, dashTicks: 0,
+    bounceTicks: 0,
   };
 
   lastTime = 0;
@@ -543,11 +544,18 @@ function editorLoop(time) {
   requestAnimationFrame(editorLoop);
 }
 
+const btnEditorBorders = document.getElementById('btn-editor-borders');
+btnEditorBorders.addEventListener('click', () => {
+  if (!editor) return;
+  editor.generateBoundaries();
+});
+
 btnEditorTest.addEventListener('click', () => {
   if (!editor) return;
   editor.testing = true;
   editorTransition = 1;
   editorTransitionType = 'start';
+  editor.generateBoundaries();
   editorTestMap = editor.toMap();
   // Reset crumble states
   for (const p of editorTestMap.platforms) {
@@ -562,6 +570,7 @@ btnEditorTest.addEventListener('click', () => {
     isIt: false, frozen: false,
     hasDoubleJump: doubleJumpEnabled,
     dashCharge: 1, dashTicks: 0,
+    bounceTicks: 0,
   };
   editorTestLastTime = 0;
   editorTestAccum = 0;
@@ -730,6 +739,7 @@ net.on(S.GAME_STARTED, (msg) => {
       isIt: myData.isIt, frozen: myData.frozen,
       hasDoubleJump: true,
       dashCharge: 1, dashTicks: 0,
+      bounceTicks: 0,
     };
   }
 
@@ -908,6 +918,8 @@ function isPlatGone(plat, platIndex) {
 }
 
 function predictLocal(p, inp, platforms) {
+  if (p.bounceTicks > 0) p.bounceTicks--;
+
   // Speed pad check
   let speedMul = 1;
   if (p.onGround) {
@@ -960,8 +972,9 @@ function predictLocal(p, inp, platforms) {
     if (inp.left) { targetVx = -speed; p.facingRight = false; }
     if (inp.right) { targetVx = speed; p.facingRight = true; }
 
+    const accel = (p.bounceTicks > 0) ? MOVE_ACCEL * 0.15 : MOVE_ACCEL;
     if (targetVx !== 0) {
-      p.vx += (targetVx - p.vx) * MOVE_ACCEL;
+      p.vx += (targetVx - p.vx) * accel;
     } else {
       p.vx *= MOVE_FRICTION;
       if (Math.abs(p.vx) < 0.3) p.vx = 0;
@@ -1045,6 +1058,7 @@ function predictLocal(p, inp, platforms) {
         else if (p.vx < 0) p.x = plat.x + plat.w;
         p.vy = TRAMPOLINE_FORCE; // launch upward
         p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+        p.bounceTicks = BOUNCE_AIR_TICKS;
         return;
       }
       if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
@@ -1087,6 +1101,7 @@ function predictLocal(p, inp, platforms) {
               p.vy = TRAMPOLINE_FORCE;
             }
             p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+            p.bounceTicks = BOUNCE_AIR_TICKS;
             return;
           }
           if (plat.type === 'dash_block') {
@@ -1106,12 +1121,13 @@ function predictLocal(p, inp, platforms) {
             p.y = plat.y + plat.h;
             p.vy = -TRAMPOLINE_FORCE;
             p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+            p.bounceTicks = BOUNCE_AIR_TICKS;
             return;
           }
           p.y = plat.y + plat.h;
         }
         p.vy = 0;
-        if (p.onGround) p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+        if (p.onGround) { p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true; p.bounceTicks = 0; }
         return;
       }
     }

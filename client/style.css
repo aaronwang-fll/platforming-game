@@ -39,9 +39,15 @@ body {
 
 #lobby .subtitle {
   color: rgba(255,255,255,0.7);
-  margin-bottom: 1.8em;
+  margin-bottom: 0.4em;
   font-size: 0.95em;
   font-weight: 600;
+}
+
+.build-id {
+  color: rgba(255,255,255,0.3);
+  font-size: 0.7em;
+  margin-bottom: 1em;
 }
 
 #lobby input, #lobby select, #lobby button {
@@ -220,6 +226,27 @@ body {
 
 .btn-practice:hover {
   background: rgba(255,255,255,0.3) !important;
+}
+
+.changelog {
+  margin-top: 12px;
+  text-align: left;
+  font-size: 0.8em;
+  color: rgba(255,255,255,0.6);
+}
+.changelog summary {
+  cursor: pointer;
+  color: rgba(255,255,255,0.5);
+  font-weight: 700;
+  text-align: center;
+}
+.changelog ul {
+  list-style: disc;
+  padding-left: 20px;
+  margin-top: 6px;
+}
+.changelog li {
+  padding: 2px 0;
 }
 
 /* Settings overlay */

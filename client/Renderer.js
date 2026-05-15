@@ -63,17 +63,7 @@ export class Renderer {
   }
 
   drawDecor(map, camera) {
-    const ctx = this.ctx;
-    const t = map.theme || 'sky';
-    const col = (t === 'rooftops') ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)';
-    ctx.fillStyle = col;
-    for (let i = 0; i < 10; i++) {
-      const px = ((i * 211 + 50) % (CANVAS_WIDTH + 100)) - camera.x * (0.02 + i * 0.005);
-      const py = ((i * 137 + 30) % CANVAS_HEIGHT) + Math.sin(Date.now() * 0.0004 + i) * 6;
-      ctx.beginPath();
-      ctx.arc(px, py, 3 + (i % 3) * 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Removed — no floating particles
   }
 
   // ========================
@@ -87,40 +77,70 @@ export class Renderer {
 
       // --- Trampoline ---
       if (p.type === 'trampoline') {
-        ctx.fillStyle = COL_TRAMPOLINE;
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        // Zigzag spring pattern on top
         const bd = p.bounceDir || 0;
-        ctx.strokeStyle = '#8AEEA8';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
+
         if (bd === 0 || bd === 2) {
-          // Horizontal strip — zigzag along width
-          const zy = (bd === 0) ? p.y : p.y + p.h;
-          const peaks = 4;
-          const segW = p.w / (peaks * 2);
-          const amp = (bd === 0) ? -5 : 5;
-          ctx.moveTo(p.x, zy);
-          for (let i = 0; i < peaks * 2; i++) {
-            const nx = p.x + (i + 1) * segW;
-            const ny = (i % 2 === 0) ? zy + amp : zy;
-            ctx.lineTo(nx, ny);
+          // Horizontal trampoline (floor or ceiling)
+          const baseY = (bd === 0) ? p.y + p.h - 3 : p.y;
+          const surfY = (bd === 0) ? p.y : p.y + p.h - 3;
+
+          // Base frame
+          ctx.fillStyle = '#1E8449';
+          ctx.fillRect(p.x, baseY, p.w, 3);
+
+          // Springs (zigzag lines between base and surface)
+          ctx.strokeStyle = '#7DCEA0';
+          ctx.lineWidth = 1.5;
+          const numSprings = Math.max(2, Math.floor(p.w / 16));
+          for (let i = 0; i < numSprings; i++) {
+            const sx = p.x + (i + 0.5) * (p.w / numSprings);
+            ctx.beginPath();
+            ctx.moveTo(sx, baseY);
+            const coils = 3;
+            for (let j = 0; j <= coils * 2; j++) {
+              const t = j / (coils * 2);
+              const cy = baseY + (surfY - baseY) * t;
+              const cx = sx + ((j % 2 === 0) ? -3 : 3);
+              ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
           }
+
+          // Bounce surface (top bar)
+          ctx.fillStyle = '#27AE60';
+          ctx.fillRect(p.x, surfY, p.w, 3);
+
         } else {
-          // Vertical strip — zigzag along height
-          const zx = (bd === 1) ? p.x + p.w : p.x;
-          const peaks = 4;
-          const segH = p.h / (peaks * 2);
-          const amp = (bd === 1) ? 5 : -5;
-          ctx.moveTo(zx, p.y);
-          for (let i = 0; i < peaks * 2; i++) {
-            const ny = p.y + (i + 1) * segH;
-            const nx = (i % 2 === 0) ? zx + amp : zx;
-            ctx.lineTo(nx, ny);
+          // Vertical trampoline (wall)
+          const baseX = (bd === 1) ? p.x + p.w - 3 : p.x;
+          const surfX = (bd === 1) ? p.x : p.x + p.w - 3;
+
+          // Base frame
+          ctx.fillStyle = '#1E8449';
+          ctx.fillRect(baseX, p.y, 3, p.h);
+
+          // Springs
+          ctx.strokeStyle = '#7DCEA0';
+          ctx.lineWidth = 1.5;
+          const numSprings = Math.max(2, Math.floor(p.h / 16));
+          for (let i = 0; i < numSprings; i++) {
+            const sy = p.y + (i + 0.5) * (p.h / numSprings);
+            ctx.beginPath();
+            ctx.moveTo(baseX + 1.5, sy);
+            const coils = 3;
+            for (let j = 0; j <= coils * 2; j++) {
+              const t = j / (coils * 2);
+              const cx = baseX + (surfX - baseX) * t;
+              const cy = sy + ((j % 2 === 0) ? -3 : 3);
+              ctx.lineTo(cx, cy);
+            }
+            ctx.stroke();
           }
+
+          // Bounce surface (side bar)
+          ctx.fillStyle = '#27AE60';
+          ctx.fillRect(surfX, p.y, 3, p.h);
         }
-        ctx.stroke();
-        randomDots(ctx, p, 'rgba(255,255,255,0.3)');
         continue;
       }
 
@@ -160,8 +180,12 @@ export class Renderer {
         randomDots(ctx, p, 'rgba(255,255,255,0.28)');
         // Subtle wood grain lines
         drawWoodGrain(ctx, p);
-        // Motion blur streaks (rightward by default)
-        drawMotionStreaks(ctx, p, 0);
+        // Speed lines inside the block
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        for (let i = 0; i < 4; i++) {
+          const ly = p.y + 4 + i * (p.h - 8) / 3;
+          ctx.fillRect(p.x + 2, ly, p.w - 4, 1.5);
+        }
         continue;
       }
 
@@ -172,22 +196,39 @@ export class Renderer {
         const isShaking = timer > CRUMBLE_GONE_TIME;
 
         if (isGone) {
-          ctx.strokeStyle = 'rgba(200,169,110,0.2)';
+          // Ghost outline
+          ctx.strokeStyle = 'rgba(200,169,110,0.15)';
           ctx.lineWidth = 1;
-          ctx.setLineDash([4, 4]);
+          ctx.setLineDash([3, 3]);
           ctx.strokeRect(p.x, p.y, p.w, p.h);
           ctx.setLineDash([]);
           continue;
         }
 
-        const sx = isShaking ? (Math.random() - 0.5) * 3 : 0;
-        const sy = isShaking ? (Math.random() - 0.5) * 2 : 0;
-        ctx.globalAlpha = isShaking ? 0.6 : 1;
-        ctx.fillStyle = COL_CRUMBLE;
+        const shake = isShaking ? 4 : 0;
+        const sx = isShaking ? (Math.random() - 0.5) * shake : 0;
+        const sy = isShaking ? (Math.random() - 0.5) * shake : 0;
+        ctx.globalAlpha = isShaking ? (0.5 + Math.random() * 0.3) : 1;
+
+        // Box body
+        ctx.fillStyle = isShaking ? '#B8864E' : COL_CRUMBLE;
         ctx.fillRect(p.x + sx, p.y + sy, p.w, p.h);
-        randomDots(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h }, 'rgba(255,255,255,0.25)');
-        // Subtle wood grain lines
+
+        // Wood grain
         drawWoodGrain(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h });
+
+        // X mark showing breakable
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x + sx + 3, p.y + sy + 3);
+        ctx.lineTo(p.x + sx + p.w - 3, p.y + sy + p.h - 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p.x + sx + p.w - 3, p.y + sy + 3);
+        ctx.lineTo(p.x + sx + 3, p.y + sy + p.h - 3);
+        ctx.stroke();
+
         ctx.globalAlpha = 1;
         continue;
       }
@@ -195,22 +236,36 @@ export class Renderer {
       // --- Jump-Through ---
       if (p.type === 'jumpthrough') {
         const pd = p.passDir || 0;
-        ctx.fillStyle = COL_JUMPTHROUGH;
-        ctx.globalAlpha = 0.5;
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = COL_JUMPTHROUGH;
-        // Solid line on the landing side
+
+        let grad;
         if (pd === 0) {
-          ctx.fillRect(p.x, p.y, p.w, 3); // solid top
+          grad = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+          grad.addColorStop(0, COL_JUMPTHROUGH);
+          grad.addColorStop(1, 'rgba(224,86,160,0.1)');
         } else if (pd === 1) {
-          ctx.fillRect(p.x + p.w - 3, p.y, 3, p.h); // solid right
+          grad = ctx.createLinearGradient(p.x, 0, p.x + p.w, 0);
+          grad.addColorStop(0, 'rgba(224,86,160,0.1)');
+          grad.addColorStop(1, COL_JUMPTHROUGH);
         } else if (pd === 2) {
-          ctx.fillRect(p.x, p.y + p.h - 3, p.w, 3); // solid bottom
+          grad = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+          grad.addColorStop(0, 'rgba(224,86,160,0.1)');
+          grad.addColorStop(1, COL_JUMPTHROUGH);
         } else {
-          ctx.fillRect(p.x, p.y, 3, p.h); // solid left
+          grad = ctx.createLinearGradient(p.x, 0, p.x + p.w, 0);
+          grad.addColorStop(0, COL_JUMPTHROUGH);
+          grad.addColorStop(1, 'rgba(224,86,160,0.1)');
         }
-        randomDots(ctx, p, 'rgba(255,255,255,0.25)');
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+
+        // Solid line on landing side
+        ctx.fillStyle = COL_JUMPTHROUGH;
+        if (pd === 0) ctx.fillRect(p.x, p.y, p.w, 3);
+        else if (pd === 1) ctx.fillRect(p.x + p.w - 3, p.y, 3, p.h);
+        else if (pd === 2) ctx.fillRect(p.x, p.y + p.h - 3, p.w, 3);
+        else ctx.fillRect(p.x, p.y, 3, p.h);
+
         continue;
       }
 
@@ -476,25 +531,3 @@ function drawWoodGrain(ctx, p) {
   }
 }
 
-// Motion blur streaks in push direction
-function drawMotionStreaks(ctx, p, dir) {
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  const seed = (p.x * 11 + p.y * 17) | 0;
-  let s = seed;
-  const nextRand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return (s >> 16) / 32768; };
-  for (let i = 0; i < 3; i++) {
-    if (dir === 0) { // right
-      const sy = p.y + 2 + nextRand() * (p.h - 4);
-      ctx.fillRect(p.x + p.w, sy, 4 + nextRand() * 6, 2);
-    } else if (dir === 2) { // left
-      const sy = p.y + 2 + nextRand() * (p.h - 4);
-      ctx.fillRect(p.x - 4 - nextRand() * 6, sy, 4 + nextRand() * 6, 2);
-    } else if (dir === 1) { // down
-      const sx = p.x + 2 + nextRand() * (p.w - 4);
-      ctx.fillRect(sx, p.y + p.h, 2, 4 + nextRand() * 6);
-    } else { // up
-      const sx = p.x + 2 + nextRand() * (p.w - 4);
-      ctx.fillRect(sx, p.y - 4 - nextRand() * 6, 2, 4 + nextRand() * 6);
-    }
-  }
-}

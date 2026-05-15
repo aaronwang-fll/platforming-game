@@ -4,12 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tag Platformer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='4' width='24' height='24' rx='3' fill='%23FF6B6B'/><rect x='4' y='4' width='24' height='4' rx='2' fill='%23FF8A8A' opacity='0.6'/></svg>">
   <link rel="stylesheet" href="/client/style.css">
 </head>
 <body>
   <div id="lobby">
     <h1>TAG!</h1>
     <p class="subtitle">Online Multiplayer Tag Platformer</p>
+    <p class="build-id">Build: 2026-05-14a</p>
     <input type="text" id="name-input" placeholder="Your name" maxlength="12" autocomplete="off">
     <div class="color-picker" id="color-picker"></div>
     <button class="btn-create" id="btn-create">Create Room</button>
@@ -24,6 +26,22 @@
       <button class="btn-secondary" id="btn-editor">Editor</button>
       <button class="btn-secondary" id="btn-newwindow">Open in New Tab</button>
     </div>
+
+    <details class="changelog">
+      <summary>Changelog</summary>
+      <ul>
+        <li>Level editor with save/load codes</li>
+        <li>Rotatable trampolines & conveyors</li>
+        <li>Diagonal trampoline launch</li>
+        <li>Jump-through replaces one-way (rotatable)</li>
+        <li>Conveyor wall-ride mechanic</li>
+        <li>Speed pads with 3x boost</li>
+        <li>Crumble blocks with break animation</li>
+        <li>Slower, more deliberate pace</li>
+        <li>Key remapping & settings</li>
+        <li>About:blank launcher</li>
+      </ul>
+    </details>
 
     <div id="room-info">
       <p>Room Code</p>
@@ -90,6 +108,7 @@
           <label>H<input type="text" inputmode="numeric" id="editor-rows" value="37" class="editor-size-input"></label>
           <button class="editor-btn" id="btn-editor-resize">Resize</button>
         </div>
+        <button class="editor-btn" id="btn-editor-borders">Borders</button>
         <button class="editor-btn" id="btn-editor-test">Test</button>
         <button class="editor-btn" id="btn-editor-stop" style="display:none">Stop</button>
         <button class="editor-btn" id="btn-editor-save">Save Code</button>

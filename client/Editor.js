@@ -778,6 +778,38 @@ export class Editor {
     return true;
   }
 
+  generateBoundaries() {
+    // Find bounding box
+    let minCol = this.cols, minRow = this.rows, maxCol = 0, maxRow = 0;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (this.grid[r][c] !== 0) {
+          if (c < minCol) minCol = c;
+          if (c + 1 > maxCol) maxCol = c + 1;
+          if (r < minRow) minRow = r;
+          if (r + 1 > maxRow) maxRow = r + 1;
+        }
+      }
+    }
+    if (maxCol === 0) return; // nothing placed
+
+    // Add floor row below
+    const floorRow = Math.min(maxRow, this.rows - 1);
+    for (let c = Math.max(0, minCol - 1); c < Math.min(this.cols, maxCol + 1); c++) {
+      if (this.grid[floorRow][c] === 0) this.grid[floorRow][c] = 1;
+    }
+    // Add left wall
+    const wallCol = Math.max(0, minCol - 1);
+    for (let r = Math.max(0, minRow - 1); r <= floorRow; r++) {
+      if (this.grid[r][wallCol] === 0) this.grid[r][wallCol] = 1;
+    }
+    // Add right wall
+    const wallColR = Math.min(this.cols - 1, maxCol);
+    for (let r = Math.max(0, minRow - 1); r <= floorRow; r++) {
+      if (this.grid[r][wallColR] === 0) this.grid[r][wallColR] = 1;
+    }
+  }
+
   clear() {
     this.grid = this.makeGrid();
   }

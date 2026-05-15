@@ -29,6 +29,9 @@ export class Player {
     this.dashCharge = 1; // start full
     this.dashTicks = 0;  // ticks remaining in active dash
     this.dashHeld = false;
+
+    // Bounce air control
+    this.bounceTicks = 0;
   }
 
   spawn(sx, sy) {
@@ -41,6 +44,7 @@ export class Player {
     this.hasDoubleJump = true;
     this.dashCharge = 1;
     this.dashTicks = 0;
+    this.bounceTicks = 0;
   }
 
   toSnapshot() {

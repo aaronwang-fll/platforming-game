@@ -4,7 +4,7 @@ import {
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
   MOVE_ACCEL, MOVE_FRICTION, DOUBLE_JUMP_FORCE, TRAMPOLINE_FORCE,
   DASH_CHARGE_RATE, DASH_SPEED, DASH_DURATION, SPEED_PAD_MULTIPLIER,
-  CONVEYOR_SPEED,
+  CONVEYOR_SPEED, BOUNCE_AIR_TICKS,
 } from '../shared/constants.js';
 
 function isPassthrough(plat) {
@@ -59,6 +59,8 @@ function skipVerticalCollision(plat, stepVy, prevBottom, platY) {
 export function updatePlayer(p, platforms) {
   if (p.frozen) return;
 
+  if (p.bounceTicks > 0) p.bounceTicks--;
+
   // Check if player is standing on a speed pad (from last tick's ground state)
   let onSpeedPad = false;
   if (p.onGround) {
@@ -111,8 +113,9 @@ export function updatePlayer(p, platforms) {
     if (p.input.left) { targetVx = -speed; p.facingRight = false; }
     if (p.input.right) { targetVx = speed; p.facingRight = true; }
 
+    const accel = (p.bounceTicks > 0) ? MOVE_ACCEL * 0.15 : MOVE_ACCEL;
     if (targetVx !== 0) {
-      p.vx += (targetVx - p.vx) * MOVE_ACCEL;
+      p.vx += (targetVx - p.vx) * accel;
     } else {
       p.vx *= MOVE_FRICTION;
       if (Math.abs(p.vx) < 0.3) p.vx = 0;
@@ -216,14 +219,17 @@ export function updatePlayer(p, platforms) {
             if (bd === undefined || bd === 0) {
               p.vy = TRAMPOLINE_FORCE;
               p.hasDoubleJump = true;
+              p.bounceTicks = BOUNCE_AIR_TICKS;
               return;
             } else if (bd === 2) {
               p.vy = TRAMPOLINE_FORCE;
               p.hasDoubleJump = true;
+              p.bounceTicks = BOUNCE_AIR_TICKS;
               return;
             }
             p.vy = TRAMPOLINE_FORCE;
             p.hasDoubleJump = true;
+            p.bounceTicks = BOUNCE_AIR_TICKS;
             return;
           }
           if (plat.type === 'dash_block') {
@@ -250,12 +256,13 @@ export function updatePlayer(p, platforms) {
             p.y = plat.y + plat.h;
             p.vy = -TRAMPOLINE_FORCE; // positive = downward
             p.hasDoubleJump = true;
+            p.bounceTicks = BOUNCE_AIR_TICKS;
             return;
           }
           p.y = plat.y + plat.h;
         }
         p.vy = 0;
-        if (p.onGround) p.hasDoubleJump = true;
+        if (p.onGround) { p.hasDoubleJump = true; p.bounceTicks = 0; }
         return;
       }
     }
@@ -276,6 +283,7 @@ function moveAxis(p, platforms, vx) {
         else if (vx < 0) p.x = plat.x + plat.w;
         p.vy = TRAMPOLINE_FORCE; // launch upward
         p.hasDoubleJump = true;
+        p.bounceTicks = BOUNCE_AIR_TICKS;
         return;
       }
       if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
