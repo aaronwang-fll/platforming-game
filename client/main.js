@@ -3,7 +3,7 @@ import { Renderer } from '/client/Renderer.js';
 import { Camera } from '/client/Camera.js';
 import { NetClient } from '/client/NetClient.js';
 import { Interpolation } from '/client/Interpolation.js';
-import { Editor } from '/client/Editor.js';
+import { Editor, PALETTE_TYPES, ROTATABLE } from '/client/Editor.js';
 import {
   GRAVITY, MOVE_SPEED, JUMP_FORCE, MAX_FALL_SPEED,
   PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_COLORS, IT_SPEED_BOOST,
@@ -15,7 +15,14 @@ import {
 } from '/shared/constants.js';
 import { C, S } from '/shared/protocol.js';
 
-const PASSTHROUGH_TYPES = new Set(['jumpthrough', 'oneway']);
+function isPassthrough(plat) {
+  return plat.type === 'jumpthrough' || plat.type === 'oneway';
+}
+
+function getPassDir(plat) {
+  if (plat.type === 'oneway') return 0;
+  return plat.passDir || 0;
+}
 
 // --- DOM elements ---
 const canvas = document.getElementById('game');
@@ -431,17 +438,7 @@ btnEditorResize.addEventListener('click', () => {
 
 function buildEditorPalette() {
   editorToolsEl.innerHTML = '';
-  const types = [
-    { id: 0, name: 'Eraser',       color: '#bbb',    key: '\u21e7 1' },
-    { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '\u21e7 2' },
-    { id: 2, name: 'Trampoline',   color: '#27AE60',  key: '\u21e7 3' },
-    { id: 3, name: 'Speed Pad',    color: '#E67E22',  key: '\u21e7 4' },
-    { id: 4, name: 'Crumble',      color: '#C8A96E',  key: '\u21e7 5' },
-    { id: 5, name: 'Jump-Through', color: '#E056A0',  key: '\u21e7 6' },
-    { id: 6, name: 'One-Way',      color: '#8E44AD',  key: '\u21e7 7' },
-    { id: 7, name: 'Conveyor',     color: '#3498DB',  key: '\u21e7 8' },
-  ];
-  for (const t of types) {
+  for (const t of PALETTE_TYPES) {
     const btn = document.createElement('button');
     btn.className = 'editor-tool-btn' + (t.id === 1 ? ' active' : '');
     btn.innerHTML = `<span class="editor-tool-swatch" style="background:${t.color}"></span>${t.name}<span class="editor-tool-key">${t.key}</span>`;
@@ -863,7 +860,12 @@ function isTouchingWall(p, platforms, dir) {
   const testX = p.x + dir;
   for (const plat of platforms) {
     if (plat.gone) continue;
-    if (PASSTHROUGH_TYPES.has(plat.type)) continue;
+    if (isPassthrough(plat)) {
+      const pd = getPassDir(plat);
+      if (pd === 0 || pd === 2) continue;
+      if (pd === 1 && dir > 0) continue;
+      if (pd === 3 && dir < 0) continue;
+    }
     if (
       testX < plat.x + plat.w &&
       testX + PLAYER_WIDTH > plat.x &&
@@ -900,7 +902,7 @@ function predictLocal(p, inp, platforms) {
     }
   }
 
-  // Conveyor check
+  // Floor conveyor check
   if (p.onGround) {
     for (let i = 0; i < platforms.length; i++) {
       const plat = platforms[i];
@@ -910,9 +912,7 @@ function predictLocal(p, inp, platforms) {
           Math.abs((p.y + PLAYER_HEIGHT) - plat.y) < 3) {
         const dir = plat.pushDir || 0;
         if (dir === 0) p.vx += CONVEYOR_SPEED;
-        else if (dir === 1) p.vy += CONVEYOR_SPEED;
         else if (dir === 2) p.vx -= CONVEYOR_SPEED;
-        else if (dir === 3) p.vy -= CONVEYOR_SPEED;
         break;
       }
     }
@@ -950,6 +950,33 @@ function predictLocal(p, inp, platforms) {
   const touchingWallRight = isTouchingWall(p, platforms, 2);
   const onWall = !p.onGround && (touchingWallLeft || touchingWallRight);
 
+  // --- Wall conveyor detection ---
+  let onWallConveyor = false;
+  let wallConveyorPushDir = -1;
+  if (onWall) {
+    const wallDir = touchingWallLeft ? -2 : 2;
+    const holdingToward = (touchingWallLeft && inp.left) || (touchingWallRight && inp.right);
+    if (holdingToward) {
+      const testX = p.x + wallDir;
+      for (let i = 0; i < platforms.length; i++) {
+        const plat = platforms[i];
+        if (isPlatGone(plat, i)) continue;
+        if (plat.type === 'conveyor' &&
+            testX < plat.x + plat.w &&
+            testX + PLAYER_WIDTH > plat.x &&
+            p.y < plat.y + plat.h &&
+            p.y + PLAYER_HEIGHT > plat.y) {
+          const dir = plat.pushDir || 0;
+          if (dir === 1 || dir === 3) {
+            onWallConveyor = true;
+            wallConveyorPushDir = dir;
+          }
+          break;
+        }
+      }
+    }
+  }
+
   if (inp.jump && !p.jumpHeld) {
     if (p.onGround) {
       p.vy = JUMP_FORCE;
@@ -967,31 +994,41 @@ function predictLocal(p, inp, platforms) {
   }
   p.jumpHeld = inp.jump;
 
-  p.vy += GRAVITY;
-  if (onWall && p.vy > 0 && p.dashTicks <= 0) p.vy = Math.min(p.vy, WALL_SLIDE_SPEED);
+  // --- Gravity + wall slide ---
+  if (onWallConveyor) {
+    if (wallConveyorPushDir === 1) p.vy = CONVEYOR_SPEED;
+    else if (wallConveyorPushDir === 3) p.vy = -CONVEYOR_SPEED;
+  } else {
+    p.vy += GRAVITY;
+    if (onWall && p.vy > 0 && p.dashTicks <= 0) p.vy = Math.min(p.vy, WALL_SLIDE_SPEED);
+  }
   if (p.vy > MAX_FALL_SPEED) p.vy = MAX_FALL_SPEED;
 
-  // Move X (with wall trampoline handling)
+  // Move X (with wall trampoline handling and rotated jump-through)
   p.x += p.vx;
   for (let i = 0; i < platforms.length; i++) {
     const plat = platforms[i];
     if (isPlatGone(plat, i)) continue;
-    if (PASSTHROUGH_TYPES.has(plat.type)) continue;
+    // Skip horizontal collision for passthrough based on passDir
+    if (isPassthrough(plat)) {
+      const pd = getPassDir(plat);
+      if (pd === 0 || pd === 2) continue;
+      if (pd === 1 && p.vx > 0) continue;
+      if (pd === 3 && p.vx < 0) continue;
+    }
     if (overlaps(p, plat)) {
       // Wall trampoline bounce
       if (plat.type === 'trampoline') {
         const bd = plat.bounceDir;
         if (bd === 1) {
-          // Right-side strip, bounces player left
           p.x = plat.x - PLAYER_WIDTH;
-          p.vx = TRAMPOLINE_FORCE; // -14, pushes left
+          p.vx = TRAMPOLINE_FORCE;
           p.vy = 0;
           p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
           return;
         } else if (bd === 3) {
-          // Left-side strip, bounces player right
           p.x = plat.x + plat.w;
-          p.vx = -TRAMPOLINE_FORCE; // +14, pushes right
+          p.vx = -TRAMPOLINE_FORCE;
           p.vy = 0;
           p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
           return;
@@ -1014,9 +1051,17 @@ function predictLocal(p, inp, platforms) {
       if (isPlatGone(plat, j)) continue;
       if (overlaps(p, plat)) {
         if (stepVy > 0) {
-          if (PASSTHROUGH_TYPES.has(plat.type)) {
-            const prevBottom = (p.y - stepVy) + PLAYER_HEIGHT;
-            if (prevBottom > plat.y + 2) continue;
+          // Going down
+          if (isPassthrough(plat)) {
+            const pd = getPassDir(plat);
+            if (pd === 0) {
+              const prevBottom = (p.y - stepVy) + PLAYER_HEIGHT;
+              if (prevBottom > plat.y + 2) continue;
+            } else if (pd === 2) {
+              continue; // pass from above: skip going down
+            } else {
+              continue; // passDir 1 or 3: no vertical collision
+            }
           }
           p.y = plat.y - PLAYER_HEIGHT;
           if (plat.type === 'trampoline') {
@@ -1036,7 +1081,13 @@ function predictLocal(p, inp, platforms) {
           }
           p.onGround = true;
         } else {
-          if (PASSTHROUGH_TYPES.has(plat.type)) continue;
+          // Going up
+          if (isPassthrough(plat)) {
+            const pd = getPassDir(plat);
+            if (pd === 0) continue; // pass from below: skip going up
+            if (pd === 1 || pd === 3) continue; // no vertical collision
+            // pd === 2: block going up (fall through below)
+          }
           // Ceiling trampoline
           if (plat.type === 'trampoline' && plat.bounceDir === 2) {
             p.y = plat.y + plat.h;

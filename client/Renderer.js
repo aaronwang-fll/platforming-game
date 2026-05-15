@@ -89,6 +89,37 @@ export class Renderer {
       if (p.type === 'trampoline') {
         ctx.fillStyle = COL_TRAMPOLINE;
         ctx.fillRect(p.x, p.y, p.w, p.h);
+        // Zigzag spring pattern on top
+        const bd = p.bounceDir || 0;
+        ctx.strokeStyle = '#5ED88B';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (bd === 0 || bd === 2) {
+          // Horizontal strip — zigzag along width
+          const zy = (bd === 0) ? p.y : p.y + p.h;
+          const peaks = 4;
+          const segW = p.w / (peaks * 2);
+          const amp = (bd === 0) ? -5 : 5;
+          ctx.moveTo(p.x, zy);
+          for (let i = 0; i < peaks * 2; i++) {
+            const nx = p.x + (i + 1) * segW;
+            const ny = (i % 2 === 0) ? zy + amp : zy;
+            ctx.lineTo(nx, ny);
+          }
+        } else {
+          // Vertical strip — zigzag along height
+          const zx = (bd === 1) ? p.x + p.w : p.x;
+          const peaks = 4;
+          const segH = p.h / (peaks * 2);
+          const amp = (bd === 1) ? 5 : -5;
+          ctx.moveTo(zx, p.y);
+          for (let i = 0; i < peaks * 2; i++) {
+            const ny = p.y + (i + 1) * segH;
+            const nx = (i % 2 === 0) ? zx + amp : zx;
+            ctx.lineTo(nx, ny);
+          }
+        }
+        ctx.stroke();
         randomDots(ctx, p, 'rgba(255,255,255,0.18)');
         continue;
       }
@@ -105,16 +136,18 @@ export class Renderer {
         ctx.beginPath();
         const dir = p.pushDir || 0;
         if (dir === 0) { // right
-          ctx.moveTo(cx + 8, cy); ctx.lineTo(cx - 4, cy - 6); ctx.lineTo(cx - 4, cy + 6);
+          ctx.moveTo(cx + 6, cy); ctx.lineTo(cx - 3, cy - 3); ctx.lineTo(cx - 3, cy + 3);
         } else if (dir === 1) { // down
-          ctx.moveTo(cx, cy + 8); ctx.lineTo(cx - 6, cy - 4); ctx.lineTo(cx + 6, cy - 4);
+          ctx.moveTo(cx, cy + 6); ctx.lineTo(cx - 3, cy - 3); ctx.lineTo(cx + 3, cy - 3);
         } else if (dir === 2) { // left
-          ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 4, cy - 6); ctx.lineTo(cx + 4, cy + 6);
+          ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 3, cy - 3); ctx.lineTo(cx + 3, cy + 3);
         } else { // up
-          ctx.moveTo(cx, cy - 8); ctx.lineTo(cx - 6, cy + 4); ctx.lineTo(cx + 6, cy + 4);
+          ctx.moveTo(cx, cy - 6); ctx.lineTo(cx - 3, cy + 3); ctx.lineTo(cx + 3, cy + 3);
         }
         ctx.closePath();
         ctx.fill();
+        // Motion blur streaks in push direction
+        drawMotionStreaks(ctx, p, dir);
         continue;
       }
 
@@ -123,6 +156,10 @@ export class Renderer {
         ctx.fillStyle = COL_SPEED;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         randomDots(ctx, p, 'rgba(255,255,255,0.15)');
+        // Subtle wood grain lines
+        drawWoodGrain(ctx, p);
+        // Motion blur streaks (rightward by default)
+        drawMotionStreaks(ctx, p, 0);
         continue;
       }
 
@@ -147,23 +184,35 @@ export class Renderer {
         ctx.fillStyle = COL_CRUMBLE;
         ctx.fillRect(p.x + sx, p.y + sy, p.w, p.h);
         randomDots(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h }, 'rgba(255,255,255,0.14)');
+        // Subtle wood grain lines
+        drawWoodGrain(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h });
         ctx.globalAlpha = 1;
         continue;
       }
 
       // --- Jump-Through ---
       if (p.type === 'jumpthrough') {
+        const pd = p.passDir || 0;
         ctx.fillStyle = COL_JUMPTHROUGH;
         ctx.globalAlpha = 0.5;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         ctx.globalAlpha = 1;
         ctx.fillStyle = COL_JUMPTHROUGH;
-        ctx.fillRect(p.x, p.y, p.w, 3);
+        // Solid line on the landing side
+        if (pd === 0) {
+          ctx.fillRect(p.x, p.y, p.w, 3); // solid top
+        } else if (pd === 1) {
+          ctx.fillRect(p.x + p.w - 3, p.y, 3, p.h); // solid right
+        } else if (pd === 2) {
+          ctx.fillRect(p.x, p.y + p.h - 3, p.w, 3); // solid bottom
+        } else {
+          ctx.fillRect(p.x, p.y, 3, p.h); // solid left
+        }
         randomDots(ctx, p, 'rgba(255,255,255,0.12)');
         continue;
       }
 
-      // --- One-Way ---
+      // --- One-Way (legacy) ---
       if (p.type === 'oneway') {
         ctx.fillStyle = COL_ONEWAY;
         ctx.globalAlpha = 0.5;
@@ -375,9 +424,8 @@ export class Renderer {
       [COL_TRAMPOLINE, 'Trampoline', 'Bounces you (rotatable)'],
       [COL_SPEED, 'Speed Pad', '2x speed + dash refill'],
       [COL_CRUMBLE, 'Crumble', 'Breaks when stepped on'],
-      [COL_JUMPTHROUGH, 'Jump-Through', 'Pass up through it'],
-      [COL_ONEWAY, 'One-Way', 'Land on top only'],
-      [COL_CONVEYOR, 'Conveyor', 'Pushes you (rotatable)'],
+      [COL_JUMPTHROUGH, 'Jump-Through', 'Pass through one side (rotatable)'],
+      [COL_CONVEYOR, 'Conveyor', 'Pushes you (rotatable, wall-ride)'],
     ];
     for (const [c, n, d] of blocks) {
       ctx.fillStyle = c;
@@ -411,5 +459,40 @@ function randomDots(ctx, p, color) {
     const dx = p.x + 2 + nextRand() * (p.w - 4);
     const dy = p.y + 2 + nextRand() * (p.h - 4);
     ctx.fillRect(Math.floor(dx), Math.floor(dy), 2, 2);
+  }
+}
+
+// Subtle horizontal wood grain lines
+function drawWoodGrain(ctx, p) {
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1;
+  for (let dy = 6; dy < p.h; dy += 7) {
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y + dy);
+    ctx.lineTo(p.x + p.w, p.y + dy);
+    ctx.stroke();
+  }
+}
+
+// Subtle motion blur streaks in push direction
+function drawMotionStreaks(ctx, p, dir) {
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  const seed = (p.x * 11 + p.y * 17) | 0;
+  let s = seed;
+  const nextRand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return (s >> 16) / 32768; };
+  for (let i = 0; i < 3; i++) {
+    if (dir === 0) { // right
+      const sy = p.y + 2 + nextRand() * (p.h - 4);
+      ctx.fillRect(p.x + p.w, sy, 4 + nextRand() * 6, 2);
+    } else if (dir === 2) { // left
+      const sy = p.y + 2 + nextRand() * (p.h - 4);
+      ctx.fillRect(p.x - 4 - nextRand() * 6, sy, 4 + nextRand() * 6, 2);
+    } else if (dir === 1) { // down
+      const sx = p.x + 2 + nextRand() * (p.w - 4);
+      ctx.fillRect(sx, p.y + p.h, 2, 4 + nextRand() * 6);
+    } else { // up
+      const sx = p.x + 2 + nextRand() * (p.w - 4);
+      ctx.fillRect(sx, p.y - 4 - nextRand() * 6, 2, 4 + nextRand() * 6);
+    }
   }
 }

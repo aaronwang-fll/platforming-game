@@ -8,7 +8,7 @@ const MIN_ROWS = 15;  // 480px
 const MAX_COLS = 100; // 3200px
 const MAX_ROWS = 60;  // 1920px
 
-// Block types: 0=empty, 1=solid, 2=trampoline, 3=dash_block, 4=crumble, 5=jumpthrough, 6=oneway, 7=conveyor
+// Block types: 0=empty, 1=solid, 2=trampoline, 3=dash_block, 4=crumble, 5=jumpthrough, 6=oneway(hidden), 7=conveyor
 const BLOCK_TYPES = [
   { id: 0, name: 'Eraser',       color: '#bbb',    key: '1' },
   { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '2' },
@@ -20,9 +20,20 @@ const BLOCK_TYPES = [
   { id: 7, name: 'Conveyor',     color: '#3498DB',  key: '8' },
 ];
 
+// Palette types (what appears in the editor toolbar) — One-Way removed, Conveyor shifted to Shift+7
+const PALETTE_TYPES = [
+  { id: 0, name: 'Eraser',       color: '#bbb',    key: '\u21e7 1' },
+  { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '\u21e7 2' },
+  { id: 2, name: 'Trampoline',   color: '#27AE60',  key: '\u21e7 3' },
+  { id: 3, name: 'Speed Pad',    color: '#E67E22',  key: '\u21e7 4' },
+  { id: 4, name: 'Crumble',      color: '#C8A96E',  key: '\u21e7 5' },
+  { id: 5, name: 'Jump-Through', color: '#E056A0',  key: '\u21e7 6' },
+  { id: 7, name: 'Conveyor',     color: '#3498DB',  key: '\u21e7 7' },
+];
+
 const TYPE_NAMES = ['empty', 'solid', 'trampoline', 'dash_block', 'crumble', 'jumpthrough', 'oneway', 'conveyor'];
 
-const ROTATABLE = new Set([2, 7]); // trampoline and conveyor support rotation
+const ROTATABLE = new Set([2, 5, 7]); // trampoline, jump-through, and conveyor support rotation
 const ROT_LABELS = ['\u2191 Bottom', '\u2190 Right', '\u2193 Top', '\u2192 Left'];
 
 export class Editor {
@@ -166,11 +177,11 @@ export class Editor {
     // Don't intercept when typing in an input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     this.keysDown[e.code] = true;
-    // Shift+1-8 to select tools
+    // Shift+1-7 to select tools from palette
     if (e.shiftKey) {
       const digit = parseInt(e.key);
-      if (digit >= 1 && digit <= 8) {
-        this.setTool(digit - 1);
+      if (digit >= 1 && digit <= PALETTE_TYPES.length) {
+        this.setTool(PALETTE_TYPES[digit - 1].id);
         e.preventDefault();
       }
     }
@@ -214,7 +225,9 @@ export class Editor {
       this.rotation = 0;
     }
     const tools = document.querySelectorAll('.editor-tool-btn');
-    tools.forEach((el, i) => el.classList.toggle('active', i === type));
+    // Find which palette index matches this type
+    const paletteIdx = PALETTE_TYPES.findIndex(pt => pt.id === type);
+    tools.forEach((el, i) => el.classList.toggle('active', i === paletteIdx));
   }
 
   _clampCamera() {
@@ -274,7 +287,7 @@ export class Editor {
         const y = r * CELL;
 
         if (type === 2) {
-          // Trampoline with rotation
+          // Trampoline with rotation — thin strip
           ctx.fillStyle = block.color;
           if (rot === 0) {
             ctx.fillRect(x, y + CELL - 12, CELL, 12);
@@ -286,27 +299,48 @@ export class Editor {
             ctx.fillRect(x, y, 12, CELL);
           }
         } else if (type === 7) {
-          // Conveyor - full block with arrow
+          // Conveyor — thin strip with arrow (same shape as trampoline but blue)
           ctx.fillStyle = block.color;
-          ctx.fillRect(x, y, CELL, CELL);
+          let sx, sy, sw, sh;
+          if (rot === 0) { sx = x; sy = y + CELL - 8; sw = CELL; sh = 8; }
+          else if (rot === 1) { sx = x + CELL - 8; sy = y; sw = 8; sh = CELL; }
+          else if (rot === 2) { sx = x; sy = y; sw = CELL; sh = 8; }
+          else { sx = x; sy = y; sw = 8; sh = CELL; }
+          ctx.fillRect(sx, sy, sw, sh);
           // Draw arrow showing push direction
           ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          const cx = x + CELL / 2;
-          const cy = y + CELL / 2;
+          const cx = sx + sw / 2;
+          const cy = sy + sh / 2;
           ctx.beginPath();
           if (rot === 0) { // push right
-            ctx.moveTo(cx + 8, cy); ctx.lineTo(cx - 4, cy - 6); ctx.lineTo(cx - 4, cy + 6);
+            ctx.moveTo(cx + 6, cy); ctx.lineTo(cx - 3, cy - 4); ctx.lineTo(cx - 3, cy + 4);
           } else if (rot === 1) { // push down
-            ctx.moveTo(cx, cy + 8); ctx.lineTo(cx - 6, cy - 4); ctx.lineTo(cx + 6, cy - 4);
+            ctx.moveTo(cx, cy + 6); ctx.lineTo(cx - 4, cy - 3); ctx.lineTo(cx + 4, cy - 3);
           } else if (rot === 2) { // push left
-            ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 4, cy - 6); ctx.lineTo(cx + 4, cy + 6);
+            ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 3, cy - 4); ctx.lineTo(cx + 3, cy + 4);
           } else { // push up
-            ctx.moveTo(cx, cy - 8); ctx.lineTo(cx - 6, cy + 4); ctx.lineTo(cx + 6, cy + 4);
+            ctx.moveTo(cx, cy - 6); ctx.lineTo(cx - 4, cy + 3); ctx.lineTo(cx + 4, cy + 3);
           }
           ctx.closePath();
           ctx.fill();
-        } else if (type === 5 || type === 6) {
-          // Jumpthrough / oneway — semi-transparent with solid top
+        } else if (type === 5) {
+          // Jump-Through — full block, semi-transparent with solid line on landing side based on rotation
+          ctx.fillStyle = block.color;
+          ctx.globalAlpha = 0.5;
+          ctx.fillRect(x, y, CELL, CELL);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = block.color;
+          if (rot === 0) {
+            ctx.fillRect(x, y, CELL, 3); // solid top
+          } else if (rot === 1) {
+            ctx.fillRect(x + CELL - 3, y, 3, CELL); // solid right
+          } else if (rot === 2) {
+            ctx.fillRect(x, y + CELL - 3, CELL, 3); // solid bottom
+          } else {
+            ctx.fillRect(x, y, 3, CELL); // solid left
+          }
+        } else if (type === 6) {
+          // One-Way (legacy) — semi-transparent with solid top
           ctx.fillStyle = block.color;
           ctx.globalAlpha = 0.5;
           ctx.fillRect(x, y, CELL, CELL);
@@ -431,13 +465,45 @@ export class Editor {
         }
 
         if (type === 7) {
-          // Conveyor — each cell is its own platform
+          // Conveyor — thin strip, each cell is its own platform
+          const bx = c * CELL - offX;
+          const by = r * CELL - offY;
+          let tx, ty, tw, th;
+          if (rot === 0) { tx = bx; ty = by + CELL - 8; tw = CELL; th = 8; }
+          else if (rot === 1) { tx = bx + CELL - 8; ty = by; tw = 8; th = CELL; }
+          else if (rot === 2) { tx = bx; ty = by; tw = CELL; th = 8; }
+          else { tx = bx; ty = by; tw = 8; th = CELL; }
+
+          platforms.push({
+            x: tx, y: ty, w: tw, h: th,
+            type: 'conveyor',
+            pushDir: rot, // 0=right, 1=down, 2=left, 3=up
+          });
+          c++;
+          continue;
+        }
+
+        if (type === 5) {
+          // Jump-through — full 32x32 block, each cell separate (rotation matters)
           platforms.push({
             x: c * CELL - offX,
             y: r * CELL - offY,
             w: CELL, h: CELL,
-            type: 'conveyor',
-            pushDir: rot, // 0=right, 1=down, 2=left, 3=up
+            type: 'jumpthrough',
+            passDir: rot, // 0=from below, 1=from left, 2=from above, 3=from right
+          });
+          c++;
+          continue;
+        }
+
+        if (type === 6) {
+          // One-Way (legacy) — treat as jumpthrough with passDir 0
+          platforms.push({
+            x: c * CELL - offX,
+            y: r * CELL - offY,
+            w: CELL, h: CELL,
+            type: 'jumpthrough',
+            passDir: 0,
           });
           c++;
           continue;
@@ -666,3 +732,6 @@ export class Editor {
     window.removeEventListener('keyup', this._onKeyUp);
   }
 }
+
+// Exported for main.js palette building
+export { PALETTE_TYPES, ROTATABLE };
