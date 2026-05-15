@@ -270,22 +270,13 @@ function moveAxis(p, platforms, vx) {
     if (plat.gone) continue;
     if (skipHorizontalCollision(plat, vx)) continue;
     if (overlaps(p, plat)) {
-      // Wall trampoline bounce
+      // Walking into any trampoline from the side = diagonal launch
       if (plat.type === 'trampoline') {
-        const bd = plat.bounceDir;
-        if (bd === 1) {
-          p.x = plat.x - PLAYER_WIDTH;
-          p.vx = TRAMPOLINE_FORCE;
-          p.vy = 0;
-          p.hasDoubleJump = true;
-          return;
-        } else if (bd === 3) {
-          p.x = plat.x + plat.w;
-          p.vx = -TRAMPOLINE_FORCE;
-          p.vy = 0;
-          p.hasDoubleJump = true;
-          return;
-        }
+        if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
+        else if (vx < 0) p.x = plat.x + plat.w;
+        p.vy = TRAMPOLINE_FORCE; // launch upward
+        p.hasDoubleJump = true;
+        return;
       }
       if (vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (vx < 0) p.x = plat.x + plat.w;

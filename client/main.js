@@ -5,6 +5,7 @@ import { NetClient } from '/client/NetClient.js';
 import { Interpolation } from '/client/Interpolation.js';
 import { Editor, PALETTE_TYPES, ROTATABLE } from '/client/Editor.js';
 import {
+  CANVAS_WIDTH, CANVAS_HEIGHT,
   GRAVITY, MOVE_SPEED, JUMP_FORCE, MAX_FALL_SPEED,
   PLAYER_WIDTH, PLAYER_HEIGHT, PLAYER_COLORS, IT_SPEED_BOOST,
   WALL_SLIDE_SPEED, WALL_JUMP_FORCE_X, WALL_JUMP_FORCE_Y,
@@ -447,6 +448,9 @@ function buildEditorPalette() {
   }
 }
 
+let editorTransition = 0;
+let editorTransitionType = null;
+
 let editorTestPlayer = null;
 let editorTestMap = null;
 let editorTestPrevX = 0, editorTestPrevY = 0;
@@ -527,12 +531,23 @@ function editorLoop(time) {
     editor.render(renderer.ctx);
   }
 
+  // Fade transition overlay
+  if (editorTransition > 0) {
+    const ctx = renderer.ctx;
+    ctx.fillStyle = `rgba(0,0,0,${editorTransition * 0.5})`;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    editorTransition -= 0.05;
+    if (editorTransition < 0) editorTransition = 0;
+  }
+
   requestAnimationFrame(editorLoop);
 }
 
 btnEditorTest.addEventListener('click', () => {
   if (!editor) return;
   editor.testing = true;
+  editorTransition = 1;
+  editorTransitionType = 'start';
   editorTestMap = editor.toMap();
   // Reset crumble states
   for (const p of editorTestMap.platforms) {
@@ -561,6 +576,8 @@ btnEditorTest.addEventListener('click', () => {
 btnEditorStop.addEventListener('click', () => {
   if (!editor) return;
   editor.testing = false;
+  editorTransition = 1;
+  editorTransitionType = 'stop';
   editorTestPlayer = null;
   editorTestMap = null;
   btnEditorTest.style.display = '';
@@ -607,6 +624,11 @@ btnEditorLoad.addEventListener('click', () => {
 btnEditorClear.addEventListener('click', () => {
   if (!editor) return;
   if (confirm('Clear the entire grid?')) editor.clear();
+});
+
+document.getElementById('btn-editor-keybinds').addEventListener('click', () => {
+  settingsOverlay.style.display = 'flex';
+  renderKeybinds();
 });
 
 btnEditorExit.addEventListener('click', () => {
@@ -1017,22 +1039,13 @@ function predictLocal(p, inp, platforms) {
       if (pd === 3 && p.vx < 0) continue;
     }
     if (overlaps(p, plat)) {
-      // Wall trampoline bounce
+      // Walking into any trampoline from the side = diagonal launch
       if (plat.type === 'trampoline') {
-        const bd = plat.bounceDir;
-        if (bd === 1) {
-          p.x = plat.x - PLAYER_WIDTH;
-          p.vx = TRAMPOLINE_FORCE;
-          p.vy = 0;
-          p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
-          return;
-        } else if (bd === 3) {
-          p.x = plat.x + plat.w;
-          p.vx = -TRAMPOLINE_FORCE;
-          p.vy = 0;
-          p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
-          return;
-        }
+        if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
+        else if (p.vx < 0) p.x = plat.x + plat.w;
+        p.vy = TRAMPOLINE_FORCE; // launch upward
+        p.hasDoubleJump = practiceMode ? doubleJumpEnabled : true;
+        return;
       }
       if (p.vx > 0) p.x = plat.x - PLAYER_WIDTH;
       else if (p.vx < 0) p.x = plat.x + plat.w;

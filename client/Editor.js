@@ -52,7 +52,7 @@ export class Editor {
     this.mouseX = -1;
     this.mouseY = -1;
     this.painting = false;
-    this.erasing = false;
+    this._panning = false;
     this._paintingAs = 0;
     this.keysDown = {};
     this.testing = false;
@@ -133,18 +133,29 @@ export class Editor {
     if (this.testing) return;
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
     if (e.button === 2) {
-      this.erasing = true;
-      this._paintCell(col, row, 0);
+      // Right-click drag = pan camera
+      this._panning = true;
+      this._panStartX = e.clientX;
+      this._panStartY = e.clientY;
+      this._panStartCamX = this.camX;
+      this._panStartCamY = this.camY;
     } else if (e.button === 0) {
-      const cellVal = this._encodedValue(this.tool);
-      if (col >= 0 && col < this.cols && row >= 0 && row < this.rows && this.grid[row][col] === cellVal) {
+      if (e.shiftKey) {
+        // Shift+click = erase
         this.painting = true;
         this._paintingAs = 0;
         this._paintCell(col, row, 0);
       } else {
-        this.painting = true;
-        this._paintingAs = cellVal;
-        this._paintCell(col, row, cellVal);
+        const cellVal = this._encodedValue(this.tool);
+        if (col >= 0 && col < this.cols && row >= 0 && row < this.rows && this.grid[row][col] === cellVal) {
+          this.painting = true;
+          this._paintingAs = 0;
+          this._paintCell(col, row, 0);
+        } else {
+          this.painting = true;
+          this._paintingAs = cellVal;
+          this._paintCell(col, row, cellVal);
+        }
       }
     }
   }
@@ -162,20 +173,37 @@ export class Editor {
     this.mouseX = (e.clientX - s.left) * s.scaleX;
     this.mouseY = (e.clientY - s.top) * s.scaleY;
     if (this.testing) return;
+    if (this._panning) {
+      this.camX = this._panStartCamX - (e.clientX - this._panStartX) * s.scaleX;
+      this.camY = this._panStartCamY - (e.clientY - this._panStartY) * s.scaleY;
+      this._clampCamera();
+      return;
+    }
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
     if (this.painting) this._paintCell(col, row, this._paintingAs);
-    if (this.erasing) this._paintCell(col, row, 0);
   }
 
   _handleMouseUp() {
     this.painting = false;
-    this.erasing = false;
+    this._panning = false;
   }
 
   _handleKeyDown(e) {
-    if (this.testing) return;
-    // Don't intercept when typing in an input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    // Shift+T/S work in both edit and test mode
+    if (e.shiftKey && e.code === 'KeyT' && !this.testing) {
+      document.getElementById('btn-editor-test').click();
+      e.preventDefault();
+      return;
+    }
+    if (e.shiftKey && e.code === 'KeyS' && this.testing) {
+      document.getElementById('btn-editor-stop').click();
+      e.preventDefault();
+      return;
+    }
+
+    if (this.testing) return;
     this.keysDown[e.code] = true;
     // Shift+1-7 to select tools from palette
     if (e.shiftKey) {
@@ -299,7 +327,7 @@ export class Editor {
             ctx.fillRect(x, y, 12, CELL);
           }
         } else if (type === 7) {
-          // Conveyor — thin strip with arrow (same shape as trampoline but blue)
+          // Conveyor — thin strip with animated dashes
           ctx.fillStyle = block.color;
           let sx, sy, sw, sh;
           if (rot === 0) { sx = x; sy = y + CELL - 8; sw = CELL; sh = 8; }
@@ -307,22 +335,26 @@ export class Editor {
           else if (rot === 2) { sx = x; sy = y; sw = CELL; sh = 8; }
           else { sx = x; sy = y; sw = 8; sh = CELL; }
           ctx.fillRect(sx, sy, sw, sh);
-          // Draw arrow showing push direction
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          const cx = sx + sw / 2;
-          const cy = sy + sh / 2;
-          ctx.beginPath();
-          if (rot === 0) { // push right
-            ctx.moveTo(cx + 6, cy); ctx.lineTo(cx - 3, cy - 4); ctx.lineTo(cx - 3, cy + 4);
-          } else if (rot === 1) { // push down
-            ctx.moveTo(cx, cy + 6); ctx.lineTo(cx - 4, cy - 3); ctx.lineTo(cx + 4, cy - 3);
-          } else if (rot === 2) { // push left
-            ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 3, cy - 4); ctx.lineTo(cx + 3, cy + 4);
-          } else { // push up
-            ctx.moveTo(cx, cy - 6); ctx.lineTo(cx - 4, cy + 3); ctx.lineTo(cx + 4, cy + 3);
+          // Animated scrolling dashes
+          const t = (Date.now() * 0.06) % 12;
+          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          if (rot === 0 || rot === 2) {
+            const sign = (rot === 0) ? 1 : -1;
+            for (let dx = -12 + t * sign; dx < sw + 12; dx += 12) {
+              const drawX = sx + dx;
+              if (drawX >= sx && drawX + 5 <= sx + sw) {
+                ctx.fillRect(drawX, sy + sh / 2 - 1, 5, 2);
+              }
+            }
+          } else {
+            const sign = (rot === 1) ? 1 : -1;
+            for (let dy = -12 + t * sign; dy < sh + 12; dy += 12) {
+              const drawY = sy + dy;
+              if (drawY >= sy && drawY + 5 <= sy + sh) {
+                ctx.fillRect(sx + sw / 2 - 1, drawY, 2, 5);
+              }
+            }
           }
-          ctx.closePath();
-          ctx.fill();
         } else if (type === 5) {
           // Jump-Through — full block, semi-transparent with solid line on landing side based on rotation
           ctx.fillStyle = block.color;
@@ -363,11 +395,36 @@ export class Editor {
       const hCol = Math.floor((this.mouseX + this.camX) / CELL);
       const hRow = Math.floor((this.mouseY + this.camY) / CELL);
       if (hCol >= 0 && hCol < this.cols && hRow >= 0 && hRow < this.rows) {
+        const hx0 = hCol * CELL;
+        const hy0 = hRow * CELL;
+
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
-        ctx.fillRect(hCol * CELL, hRow * CELL, CELL, CELL);
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
         ctx.lineWidth = 2;
-        ctx.strokeRect(hCol * CELL, hRow * CELL, CELL, CELL);
+
+        if (this.tool === 2) {
+          // Trampoline — thin strip preview
+          let hx, hy, hw, hh;
+          if (this.rotation === 0) { hx=hx0; hy=hy0+CELL-12; hw=CELL; hh=12; }
+          else if (this.rotation === 1) { hx=hx0+CELL-12; hy=hy0; hw=12; hh=CELL; }
+          else if (this.rotation === 2) { hx=hx0; hy=hy0; hw=CELL; hh=12; }
+          else { hx=hx0; hy=hy0; hw=12; hh=CELL; }
+          ctx.fillRect(hx, hy, hw, hh);
+          ctx.strokeRect(hx, hy, hw, hh);
+        } else if (this.tool === 7) {
+          // Conveyor — thin strip preview
+          let hx, hy, hw, hh;
+          if (this.rotation === 0) { hx=hx0; hy=hy0+CELL-8; hw=CELL; hh=8; }
+          else if (this.rotation === 1) { hx=hx0+CELL-8; hy=hy0; hw=8; hh=CELL; }
+          else if (this.rotation === 2) { hx=hx0; hy=hy0; hw=CELL; hh=8; }
+          else { hx=hx0; hy=hy0; hw=8; hh=CELL; }
+          ctx.fillRect(hx, hy, hw, hh);
+          ctx.strokeRect(hx, hy, hw, hh);
+        } else {
+          // Normal full-cell highlight
+          ctx.fillRect(hx0, hy0, CELL, CELL);
+          ctx.strokeRect(hx0, hy0, CELL, CELL);
+        }
       }
     }
 
@@ -384,9 +441,12 @@ export class Editor {
     ctx.fillText(`${this.cols}x${this.rows}`, CANVAS_WIDTH / 2, 23);
     ctx.textAlign = 'right';
     const block = BLOCK_TYPES[this.tool];
-    let toolInfo = `Tool: ${block.name} [${block.key}]`;
+    let toolInfo = `Tool: ${block.name}`;
     if (ROTATABLE.has(this.tool)) {
-      toolInfo += ` | Rot: ${ROT_LABELS[this.rotation]} [R]`;
+      const dirNames = this.tool === 7
+        ? ['Push \u2192', 'Push \u2193', 'Push \u2190', 'Push \u2191']
+        : ['Bounce \u2191', 'Bounce \u2190', 'Bounce \u2193', 'Bounce \u2192'];
+      toolInfo += ` [R: ${dirNames[this.rotation]}]`;
     }
     ctx.fillText(toolInfo, CANVAS_WIDTH - 20, 23);
     ctx.textAlign = 'left';

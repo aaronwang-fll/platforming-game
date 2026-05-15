@@ -129,25 +129,27 @@ export class Renderer {
         ctx.fillStyle = COL_CONVEYOR;
         ctx.fillRect(p.x, p.y, p.w, p.h);
         randomDots(ctx, p, 'rgba(255,255,255,0.25)');
-        // Draw arrow showing push direction
-        const cx = p.x + p.w / 2;
-        const cy = p.y + p.h / 2;
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.beginPath();
+        // Animated scrolling dashes
         const dir = p.pushDir || 0;
-        if (dir === 0) { // right
-          ctx.moveTo(cx + 6, cy); ctx.lineTo(cx - 3, cy - 3); ctx.lineTo(cx - 3, cy + 3);
-        } else if (dir === 1) { // down
-          ctx.moveTo(cx, cy + 6); ctx.lineTo(cx - 3, cy - 3); ctx.lineTo(cx + 3, cy - 3);
-        } else if (dir === 2) { // left
-          ctx.moveTo(cx - 6, cy); ctx.lineTo(cx + 3, cy - 3); ctx.lineTo(cx + 3, cy + 3);
-        } else { // up
-          ctx.moveTo(cx, cy - 6); ctx.lineTo(cx - 3, cy + 3); ctx.lineTo(cx + 3, cy + 3);
+        const t = (Date.now() * 0.06) % 12;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        if (dir === 0 || dir === 2) {
+          const sign = (dir === 0) ? 1 : -1;
+          for (let dx = -12 + t * sign; dx < p.w + 12; dx += 12) {
+            const drawX = p.x + dx;
+            if (drawX >= p.x && drawX + 5 <= p.x + p.w) {
+              ctx.fillRect(drawX, p.y + p.h / 2 - 1, 5, 2);
+            }
+          }
+        } else {
+          const sign = (dir === 1) ? 1 : -1;
+          for (let dy = -12 + t * sign; dy < p.h + 12; dy += 12) {
+            const drawY = p.y + dy;
+            if (drawY >= p.y && drawY + 5 <= p.y + p.h) {
+              ctx.fillRect(p.x + p.w / 2 - 1, drawY, 2, 5);
+            }
+          }
         }
-        ctx.closePath();
-        ctx.fill();
-        // Motion blur streaks in push direction
-        drawMotionStreaks(ctx, p, dir);
         continue;
       }
 
