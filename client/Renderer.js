@@ -91,8 +91,8 @@ export class Renderer {
         ctx.fillRect(p.x, p.y, p.w, p.h);
         // Zigzag spring pattern on top
         const bd = p.bounceDir || 0;
-        ctx.strokeStyle = '#5ED88B';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#8AEEA8';
+        ctx.lineWidth = 2.5;
         ctx.beginPath();
         if (bd === 0 || bd === 2) {
           // Horizontal strip — zigzag along width
@@ -120,7 +120,7 @@ export class Renderer {
           }
         }
         ctx.stroke();
-        randomDots(ctx, p, 'rgba(255,255,255,0.18)');
+        randomDots(ctx, p, 'rgba(255,255,255,0.3)');
         continue;
       }
 
@@ -128,7 +128,7 @@ export class Renderer {
       if (p.type === 'conveyor') {
         ctx.fillStyle = COL_CONVEYOR;
         ctx.fillRect(p.x, p.y, p.w, p.h);
-        randomDots(ctx, p, 'rgba(255,255,255,0.12)');
+        randomDots(ctx, p, 'rgba(255,255,255,0.25)');
         // Draw arrow showing push direction
         const cx = p.x + p.w / 2;
         const cy = p.y + p.h / 2;
@@ -155,7 +155,7 @@ export class Renderer {
       if (p.type === 'dash_block') {
         ctx.fillStyle = COL_SPEED;
         ctx.fillRect(p.x, p.y, p.w, p.h);
-        randomDots(ctx, p, 'rgba(255,255,255,0.15)');
+        randomDots(ctx, p, 'rgba(255,255,255,0.28)');
         // Subtle wood grain lines
         drawWoodGrain(ctx, p);
         // Motion blur streaks (rightward by default)
@@ -183,7 +183,7 @@ export class Renderer {
         ctx.globalAlpha = isShaking ? 0.6 : 1;
         ctx.fillStyle = COL_CRUMBLE;
         ctx.fillRect(p.x + sx, p.y + sy, p.w, p.h);
-        randomDots(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h }, 'rgba(255,255,255,0.14)');
+        randomDots(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h }, 'rgba(255,255,255,0.25)');
         // Subtle wood grain lines
         drawWoodGrain(ctx, { x: p.x + sx, y: p.y + sy, w: p.w, h: p.h });
         ctx.globalAlpha = 1;
@@ -208,7 +208,7 @@ export class Renderer {
         } else {
           ctx.fillRect(p.x, p.y, 3, p.h); // solid left
         }
-        randomDots(ctx, p, 'rgba(255,255,255,0.12)');
+        randomDots(ctx, p, 'rgba(255,255,255,0.25)');
         continue;
       }
 
@@ -220,7 +220,7 @@ export class Renderer {
         ctx.globalAlpha = 1;
         ctx.fillStyle = COL_ONEWAY;
         ctx.fillRect(p.x, p.y, p.w, 3);
-        randomDots(ctx, p, 'rgba(255,255,255,0.12)');
+        randomDots(ctx, p, 'rgba(255,255,255,0.25)');
         continue;
       }
 
@@ -454,7 +454,7 @@ function randomDots(ctx, p, color) {
   let s = seed;
   const nextRand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return (s >> 16) / 32768; };
   const area = p.w * p.h;
-  const count = Math.max(4, Math.floor(area / 28));
+  const count = Math.max(6, Math.floor(area / 18));
   for (let i = 0; i < count; i++) {
     const dx = p.x + 2 + nextRand() * (p.w - 4);
     const dy = p.y + 2 + nextRand() * (p.h - 4);
@@ -462,9 +462,9 @@ function randomDots(ctx, p, color) {
   }
 }
 
-// Subtle horizontal wood grain lines
+// Horizontal wood grain lines
 function drawWoodGrain(ctx, p) {
-  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
   ctx.lineWidth = 1;
   for (let dy = 6; dy < p.h; dy += 7) {
     ctx.beginPath();
@@ -474,9 +474,9 @@ function drawWoodGrain(ctx, p) {
   }
 }
 
-// Subtle motion blur streaks in push direction
+// Motion blur streaks in push direction
 function drawMotionStreaks(ctx, p, dir) {
-  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
   const seed = (p.x * 11 + p.y * 17) | 0;
   let s = seed;
   const nextRand = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return (s >> 16) / 32768; };
