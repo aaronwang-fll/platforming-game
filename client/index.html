@@ -11,7 +11,7 @@
   <div id="lobby">
     <h1>TAG!</h1>
     <p class="subtitle">Online Multiplayer Tag Platformer</p>
-    <p class="build-id">Build: 2026-05-14a</p>
+    <p class="build-id">Build: 2026-05-14b</p>
     <input type="text" id="name-input" placeholder="Your name" maxlength="12" autocomplete="off">
     <div class="color-picker" id="color-picker"></div>
     <button class="btn-create" id="btn-create">Create Room</button>
@@ -115,6 +115,7 @@
         <button class="editor-btn" id="btn-editor-load">Load Code</button>
         <button class="editor-btn" id="btn-editor-clear">Clear</button>
         <button class="editor-btn" id="btn-editor-toolbar-pos" title="Move toolbar (T)">Toolbar</button>
+        <button class="editor-btn" id="btn-editor-library">Library</button>
         <button class="editor-btn" id="btn-editor-keybinds">Keybinds</button>
         <button class="editor-btn editor-btn-exit" id="btn-editor-exit">Exit</button>
       </div>
@@ -126,6 +127,14 @@
         <button class="editor-btn" id="btn-code-copy">Copy</button>
         <button class="editor-btn" id="btn-code-close">Close</button>
       </div>
+    </div>
+    <div id="editor-library-panel" style="display:none;">
+      <div class="editor-library-header">
+        <span>Design Library</span>
+        <button class="editor-btn" id="btn-library-save">Save Current</button>
+        <button class="editor-btn" id="btn-library-close">Close</button>
+      </div>
+      <div id="editor-library-list"></div>
     </div>
   </div>
 

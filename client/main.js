@@ -657,6 +657,60 @@ document.getElementById('btn-editor-keybinds').addEventListener('click', () => {
   renderKeybinds();
 });
 
+// --- Library ---
+const libraryPanel = document.getElementById('editor-library-panel');
+const libraryList = document.getElementById('editor-library-list');
+
+document.getElementById('btn-editor-library').addEventListener('click', () => {
+  libraryPanel.style.display = libraryPanel.style.display === 'none' ? 'block' : 'none';
+  renderLibrary();
+});
+
+document.getElementById('btn-library-save').addEventListener('click', () => {
+  if (!editor) return;
+  const name = prompt('Name this design:', `Design ${editor.library.length + 1}`);
+  if (name === null) return;
+  editor.librarySave(name);
+  renderLibrary();
+});
+
+document.getElementById('btn-library-close').addEventListener('click', () => {
+  libraryPanel.style.display = 'none';
+});
+
+function renderLibrary() {
+  if (!editor) return;
+  libraryList.innerHTML = '';
+  const items = editor.libraryList();
+  if (items.length === 0) {
+    libraryList.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.8em;padding:8px;">No saved designs yet</div>';
+    return;
+  }
+  for (const item of items) {
+    const div = document.createElement('div');
+    div.className = 'library-item';
+    div.innerHTML = `<span>${item.name}</span>`;
+    const loadBtn = document.createElement('button');
+    loadBtn.textContent = 'Load';
+    loadBtn.addEventListener('click', () => {
+      editor.libraryLoad(item.index);
+      editorColsInput.value = editor.cols;
+      editorRowsInput.value = editor.rows;
+      libraryPanel.style.display = 'none';
+    });
+    const delBtn = document.createElement('button');
+    delBtn.className = 'lib-delete';
+    delBtn.textContent = 'X';
+    delBtn.addEventListener('click', () => {
+      editor.libraryDelete(item.index);
+      renderLibrary();
+    });
+    div.appendChild(loadBtn);
+    div.appendChild(delBtn);
+    libraryList.appendChild(div);
+  }
+}
+
 btnEditorExit.addEventListener('click', () => {
   if (!editor) return;
   editor.destroy();
@@ -664,6 +718,7 @@ btnEditorExit.addEventListener('click', () => {
   editorMode = false;
   editorUI.style.display = 'none';
   hideCodePanel();
+  libraryPanel.style.display = 'none';
   btnEditorTest.style.display = '';
   btnEditorStop.style.display = 'none';
   editorToolsEl.style.display = '';
@@ -686,6 +741,7 @@ net.on('connected', () => {
   btnJoin.textContent = 'Join Room';
 });
 net.on('disconnected', () => {
+  if (editorMode) return; // don't interrupt editor on disconnect
   gameActive = false;
   resetToMenu();
   btnCreate.disabled = true;

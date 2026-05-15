@@ -3,12 +3,13 @@ import { CANVAS_WIDTH, CANVAS_HEIGHT, PLAYER_WIDTH, PLAYER_HEIGHT } from '/share
 const CELL = 32;
 const DEFAULT_COLS = 62;
 const DEFAULT_ROWS = 37;
-const MIN_COLS = 20;  // 640px
-const MIN_ROWS = 15;  // 480px
-const MAX_COLS = 100; // 3200px
-const MAX_ROWS = 60;  // 1920px
+const MIN_COLS = 20;
+const MIN_ROWS = 15;
+const MAX_COLS = 100;
+const MAX_ROWS = 60;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2;
 
-// Block types: 0=empty, 1=solid, 2=trampoline, 3=dash_block, 4=crumble, 5=jumpthrough, 6=oneway(hidden), 7=conveyor
 const BLOCK_TYPES = [
   { id: 0, name: 'Eraser',       color: '#bbb',    key: '1' },
   { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '2' },
@@ -20,7 +21,6 @@ const BLOCK_TYPES = [
   { id: 7, name: 'Conveyor',     color: '#3498DB',  key: '8' },
 ];
 
-// Palette types (what appears in the editor toolbar) — One-Way removed, Conveyor shifted to Shift+7
 const PALETTE_TYPES = [
   { id: 0, name: 'Eraser',       color: '#bbb',    key: '\u21e7 1' },
   { id: 1, name: 'Solid',        color: '#3B2F2F',  key: '\u21e7 2' },
@@ -32,8 +32,9 @@ const PALETTE_TYPES = [
 ];
 
 const TYPE_NAMES = ['empty', 'solid', 'trampoline', 'dash_block', 'crumble', 'jumpthrough', 'oneway', 'conveyor'];
+const ROTATABLE = new Set([2, 5, 7]);
+const SOLID_GRID_TYPES = new Set([1, 3, 4]); // types that count as solid ground for spawns/fills
 
-const ROTATABLE = new Set([2, 5, 7]); // trampoline, jump-through, and conveyor support rotation
 const ROT_LABELS = ['\u2191 Bottom', '\u2190 Right', '\u2193 Top', '\u2192 Left'];
 
 export class Editor {
@@ -45,17 +46,26 @@ export class Editor {
     this.grid = this.makeGrid();
     this.tool = 1;
     this.rotation = 0;
+    this.zoom = 1;
     this.toolbarPos = 'bottom';
-    // Start camera at bottom-left
     this.camX = 0;
     this.camY = Math.max(0, this.rows * CELL - CANVAS_HEIGHT);
     this.mouseX = -1;
     this.mouseY = -1;
     this.painting = false;
-    this._panning = false;
+    this.erasing = false;
     this._paintingAs = 0;
+    this._panning = false;
+    this._panStartX = 0;
+    this._panStartY = 0;
+    this._panStartCamX = 0;
+    this._panStartCamY = 0;
+    this._dirToggleRect = null;
     this.keysDown = {};
     this.testing = false;
+
+    // Design library
+    this.library = this._loadLibrary();
 
     this._onMouseDown = this._handleMouseDown.bind(this);
     this._onMouseMove = this._handleMouseMove.bind(this);
@@ -63,12 +73,14 @@ export class Editor {
     this._onContextMenu = (e) => e.preventDefault();
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onKeyUp = this._handleKeyUp.bind(this);
+    this._onWheel = this._handleWheel.bind(this);
 
     canvas.addEventListener('mousedown', this._onMouseDown);
     canvas.addEventListener('mousemove', this._onMouseMove);
     canvas.addEventListener('mouseup', this._onMouseUp);
     canvas.addEventListener('mouseleave', this._onMouseUp);
     canvas.addEventListener('contextmenu', this._onContextMenu);
+    canvas.addEventListener('wheel', this._onWheel, { passive: false });
     window.addEventListener('keydown', this._onKeyDown);
     window.addEventListener('keyup', this._onKeyUp);
   }
@@ -81,29 +93,21 @@ export class Editor {
     return grid;
   }
 
-  // Resize grid, preserving existing content
   resize(newCols, newRows) {
     newCols = Math.max(MIN_COLS, Math.min(MAX_COLS, newCols));
     newRows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, newRows));
     if (newCols === this.cols && newRows === this.rows) return;
-
     const oldGrid = this.grid;
     const oldCols = this.cols;
     const oldRows = this.rows;
     this.cols = newCols;
     this.rows = newRows;
     this.grid = this.makeGrid();
-
-    // Copy existing data
-    const copyRows = Math.min(oldRows, newRows);
-    const copyCols = Math.min(oldCols, newCols);
-    for (let r = 0; r < copyRows; r++) {
-      for (let c = 0; c < copyCols; c++) {
+    for (let r = 0; r < Math.min(oldRows, newRows); r++) {
+      for (let c = 0; c < Math.min(oldCols, newCols); c++) {
         this.grid[r][c] = oldGrid[r][c];
       }
     }
-
-    // Clamp camera
     this._clampCamera();
   }
 
@@ -112,6 +116,41 @@ export class Editor {
   get minRows() { return MIN_ROWS; }
   get maxRows() { return MAX_ROWS; }
 
+  // --- Library ---
+  _loadLibrary() {
+    try {
+      const saved = localStorage.getItem('tag_editor_library');
+      if (saved) return JSON.parse(saved);
+    } catch (e) { /* ignore */ }
+    return [];
+  }
+
+  _saveLibrary() {
+    localStorage.setItem('tag_editor_library', JSON.stringify(this.library));
+  }
+
+  librarySave(name) {
+    const code = this.save();
+    this.library.push({ name: name || `Design ${this.library.length + 1}`, code, date: Date.now() });
+    this._saveLibrary();
+  }
+
+  libraryLoad(index) {
+    if (index < 0 || index >= this.library.length) return false;
+    return this.load(this.library[index].code);
+  }
+
+  libraryDelete(index) {
+    if (index < 0 || index >= this.library.length) return;
+    this.library.splice(index, 1);
+    this._saveLibrary();
+  }
+
+  libraryList() {
+    return this.library.map((entry, i) => ({ index: i, name: entry.name, date: entry.date }));
+  }
+
+  // --- Input ---
   _getCanvasScale() {
     const rect = this.canvas.getBoundingClientRect();
     return {
@@ -124,34 +163,29 @@ export class Editor {
 
   _mouseToGrid(clientX, clientY) {
     const s = this._getCanvasScale();
-    const cx = (clientX - s.left) * s.scaleX + this.camX;
-    const cy = (clientY - s.top) * s.scaleY + this.camY;
+    const cx = (clientX - s.left) * s.scaleX / this.zoom + this.camX;
+    const cy = (clientY - s.top) * s.scaleY / this.zoom + this.camY;
     return { col: Math.floor(cx / CELL), row: Math.floor(cy / CELL) };
   }
 
   _handleMouseDown(e) {
     if (this.testing) return;
 
-    // Check direction toggle click
+    // Direction toggle click
     if (e.button === 0 && this._dirToggleRect && ROTATABLE.has(this.tool)) {
       const s = this._getCanvasScale();
       const mx = (e.clientX - s.left) * s.scaleX;
       const my = (e.clientY - s.top) * s.scaleY;
       const r = this._dirToggleRect;
       if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) {
-        // Left half = previous rotation, right half = next rotation
-        if (mx < r.x + r.w / 2) {
-          this.rotation = (this.rotation + 3) & 3;
-        } else {
-          this.rotation = (this.rotation + 1) & 3;
-        }
+        if (mx < r.x + r.w / 2) this.rotation = (this.rotation + 3) & 3;
+        else this.rotation = (this.rotation + 1) & 3;
         return;
       }
     }
 
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
     if (e.button === 2) {
-      // Right-click drag = pan camera
       this._panning = true;
       this._panStartX = e.clientX;
       this._panStartY = e.clientY;
@@ -159,7 +193,6 @@ export class Editor {
       this._panStartCamY = this.camY;
     } else if (e.button === 0) {
       if (e.shiftKey) {
-        // Shift+click = erase
         this.painting = true;
         this._paintingAs = 0;
         this._paintCell(col, row, 0);
@@ -180,9 +213,7 @@ export class Editor {
 
   _encodedValue(type) {
     if (type === 0) return 0;
-    if (ROTATABLE.has(type)) {
-      return type | (this.rotation << 4);
-    }
+    if (ROTATABLE.has(type)) return type | (this.rotation << 4);
     return type;
   }
 
@@ -190,13 +221,15 @@ export class Editor {
     const s = this._getCanvasScale();
     this.mouseX = (e.clientX - s.left) * s.scaleX;
     this.mouseY = (e.clientY - s.top) * s.scaleY;
-    if (this.testing) return;
+
     if (this._panning) {
-      this.camX = this._panStartCamX - (e.clientX - this._panStartX) * s.scaleX;
-      this.camY = this._panStartCamY - (e.clientY - this._panStartY) * s.scaleY;
+      this.camX = this._panStartCamX - (e.clientX - this._panStartX) * s.scaleX / this.zoom;
+      this.camY = this._panStartCamY - (e.clientY - this._panStartY) * s.scaleY / this.zoom;
       this._clampCamera();
       return;
     }
+
+    if (this.testing) return;
     const { col, row } = this._mouseToGrid(e.clientX, e.clientY);
     if (this.painting) this._paintCell(col, row, this._paintingAs);
   }
@@ -206,10 +239,26 @@ export class Editor {
     this._panning = false;
   }
 
+  _handleWheel(e) {
+    if (this.testing) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoom + delta));
+    // Zoom toward mouse position
+    const s = this._getCanvasScale();
+    const mx = (e.clientX - s.left) * s.scaleX;
+    const my = (e.clientY - s.top) * s.scaleY;
+    const worldX = mx / this.zoom + this.camX;
+    const worldY = my / this.zoom + this.camY;
+    this.zoom = newZoom;
+    this.camX = worldX - mx / this.zoom;
+    this.camY = worldY - my / this.zoom;
+    this._clampCamera();
+  }
+
   _handleKeyDown(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    // Shift+T/S work in both edit and test mode
     if (e.shiftKey && e.code === 'KeyT' && !this.testing) {
       document.getElementById('btn-editor-test').click();
       e.preventDefault();
@@ -223,7 +272,7 @@ export class Editor {
 
     if (this.testing) return;
     this.keysDown[e.code] = true;
-    // Shift+1-7 to select tools from palette
+
     if (e.shiftKey) {
       const digit = parseInt(e.key);
       if (digit >= 1 && digit <= PALETTE_TYPES.length) {
@@ -231,14 +280,14 @@ export class Editor {
         e.preventDefault();
       }
     }
-    // R to cycle rotation (only for rotatable tools)
+
     if (e.code === 'KeyR' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       if (ROTATABLE.has(this.tool)) {
         this.rotation = (this.rotation + 1) & 3;
         e.preventDefault();
       }
     }
-    // T to cycle toolbar position
+
     if (e.code === 'KeyT' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       const positions = ['bottom', 'left', 'top', 'right'];
       const idx = positions.indexOf(this.toolbarPos);
@@ -266,26 +315,24 @@ export class Editor {
 
   setTool(type) {
     this.tool = type;
-    // Reset rotation when switching to non-rotatable tool
-    if (!ROTATABLE.has(type)) {
-      this.rotation = 0;
-    }
+    if (!ROTATABLE.has(type)) this.rotation = 0;
     const tools = document.querySelectorAll('.editor-tool-btn');
-    // Find which palette index matches this type
-    const paletteIdx = PALETTE_TYPES.findIndex(pt => pt.id === type);
+    const paletteIdx = PALETTE_TYPES.findIndex(t => t.id === type);
     tools.forEach((el, i) => el.classList.toggle('active', i === paletteIdx));
   }
 
   _clampCamera() {
     const mapW = this.cols * CELL;
     const mapH = this.rows * CELL;
-    this.camX = Math.max(0, Math.min(this.camX, Math.max(0, mapW - CANVAS_WIDTH)));
-    this.camY = Math.max(0, Math.min(this.camY, Math.max(0, mapH - CANVAS_HEIGHT)));
+    const viewW = CANVAS_WIDTH / this.zoom;
+    const viewH = CANVAS_HEIGHT / this.zoom;
+    this.camX = Math.max(0, Math.min(this.camX, Math.max(0, mapW - viewW)));
+    this.camY = Math.max(0, Math.min(this.camY, Math.max(0, mapH - viewH)));
   }
 
   updateCamera() {
     if (this.testing) return;
-    const speed = 8;
+    const speed = 8 / this.zoom;
     if (this.keysDown['KeyW'] || this.keysDown['ArrowUp']) this.camY -= speed;
     if (this.keysDown['KeyS'] || this.keysDown['ArrowDown']) this.camY += speed;
     if (this.keysDown['KeyA'] || this.keysDown['ArrowLeft']) this.camX -= speed;
@@ -295,7 +342,6 @@ export class Editor {
 
   render(ctx) {
     this.updateCamera();
-
     const mapW = this.cols * CELL;
     const mapH = this.rows * CELL;
 
@@ -303,15 +349,18 @@ export class Editor {
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     ctx.save();
+    ctx.scale(this.zoom, this.zoom);
     ctx.translate(-Math.round(this.camX), -Math.round(this.camY));
 
     // Grid lines
     ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 / this.zoom;
+    const viewW = CANVAS_WIDTH / this.zoom;
+    const viewH = CANVAS_HEIGHT / this.zoom;
     const startCol = Math.floor(this.camX / CELL);
-    const endCol = Math.min(this.cols, Math.ceil((this.camX + CANVAS_WIDTH) / CELL) + 1);
+    const endCol = Math.min(this.cols, Math.ceil((this.camX + viewW) / CELL) + 1);
     const startRow = Math.floor(this.camY / CELL);
-    const endRow = Math.min(this.rows, Math.ceil((this.camY + CANVAS_HEIGHT) / CELL) + 1);
+    const endRow = Math.min(this.rows, Math.ceil((this.camY + viewH) / CELL) + 1);
 
     for (let c = startCol; c <= endCol; c++) {
       ctx.beginPath(); ctx.moveTo(c * CELL, startRow * CELL); ctx.lineTo(c * CELL, endRow * CELL); ctx.stroke();
@@ -333,66 +382,47 @@ export class Editor {
         const y = r * CELL;
 
         if (type === 2) {
-          // Trampoline with rotation — thin strip
           ctx.fillStyle = block.color;
-          if (rot === 0) {
-            ctx.fillRect(x, y + CELL - 12, CELL, 12);
-          } else if (rot === 1) {
-            ctx.fillRect(x + CELL - 12, y, 12, CELL);
-          } else if (rot === 2) {
-            ctx.fillRect(x, y, CELL, 12);
-          } else {
-            ctx.fillRect(x, y, 12, CELL);
-          }
+          if (rot === 0) ctx.fillRect(x, y + CELL - 12, CELL, 12);
+          else if (rot === 1) ctx.fillRect(x + CELL - 12, y, 12, CELL);
+          else if (rot === 2) ctx.fillRect(x, y, CELL, 12);
+          else ctx.fillRect(x, y, 12, CELL);
         } else if (type === 7) {
-          // Conveyor — thin strip with animated dashes
           ctx.fillStyle = block.color;
-          let sx, sy, sw, sh;
-          if (rot === 0) { sx = x; sy = y + CELL - 8; sw = CELL; sh = 8; }
-          else if (rot === 1) { sx = x + CELL - 8; sy = y; sw = 8; sh = CELL; }
-          else if (rot === 2) { sx = x; sy = y; sw = CELL; sh = 8; }
-          else { sx = x; sy = y; sw = 8; sh = CELL; }
-          ctx.fillRect(sx, sy, sw, sh);
-          // Animated scrolling dashes
+          if (rot === 0) ctx.fillRect(x, y + CELL - 8, CELL, 8);
+          else if (rot === 1) ctx.fillRect(x + CELL - 8, y, 8, CELL);
+          else if (rot === 2) ctx.fillRect(x, y, CELL, 8);
+          else ctx.fillRect(x, y, 8, CELL);
+          // Animated dashes
           const t = (Date.now() * 0.06) % 12;
-          ctx.fillStyle = 'rgba(255,255,255,0.2)';
+          ctx.fillStyle = 'rgba(255,255,255,0.25)';
           if (rot === 0 || rot === 2) {
             const sign = (rot === 0) ? 1 : -1;
-            for (let dx = -12 + t * sign; dx < sw + 12; dx += 12) {
-              const drawX = sx + dx;
-              if (drawX >= sx && drawX + 5 <= sx + sw) {
-                ctx.fillRect(drawX, sy + sh / 2 - 1, 5, 2);
-              }
+            for (let dx = -12 + t * sign; dx < CELL + 12; dx += 12) {
+              const dx2 = x + dx;
+              if (dx2 >= x && dx2 + 4 <= x + CELL) ctx.fillRect(dx2, y + (rot === 0 ? CELL - 5 : 1), 4, 2);
             }
           } else {
             const sign = (rot === 1) ? 1 : -1;
-            for (let dy = -12 + t * sign; dy < sh + 12; dy += 12) {
-              const drawY = sy + dy;
-              if (drawY >= sy && drawY + 5 <= sy + sh) {
-                ctx.fillRect(sx + sw / 2 - 1, drawY, 2, 5);
-              }
+            for (let dy = -12 + t * sign; dy < CELL + 12; dy += 12) {
+              const dy2 = y + dy;
+              if (dy2 >= y && dy2 + 4 <= y + CELL) ctx.fillRect(x + (rot === 1 ? CELL - 5 : 1), dy2, 2, 4);
             }
           }
         } else if (type === 5) {
-          // Jump-Through — full block, semi-transparent with solid line on landing side based on rotation
+          const pd = rot;
           ctx.fillStyle = block.color;
-          ctx.globalAlpha = 0.5;
+          ctx.globalAlpha = 0.4;
           ctx.fillRect(x, y, CELL, CELL);
           ctx.globalAlpha = 1;
           ctx.fillStyle = block.color;
-          if (rot === 0) {
-            ctx.fillRect(x, y, CELL, 3); // solid top
-          } else if (rot === 1) {
-            ctx.fillRect(x + CELL - 3, y, 3, CELL); // solid right
-          } else if (rot === 2) {
-            ctx.fillRect(x, y + CELL - 3, CELL, 3); // solid bottom
-          } else {
-            ctx.fillRect(x, y, 3, CELL); // solid left
-          }
+          if (pd === 0) ctx.fillRect(x, y, CELL, 3);
+          else if (pd === 1) ctx.fillRect(x + CELL - 3, y, 3, CELL);
+          else if (pd === 2) ctx.fillRect(x, y + CELL - 3, CELL, 3);
+          else ctx.fillRect(x, y, 3, CELL);
         } else if (type === 6) {
-          // One-Way (legacy) — semi-transparent with solid top
           ctx.fillStyle = block.color;
-          ctx.globalAlpha = 0.5;
+          ctx.globalAlpha = 0.4;
           ctx.fillRect(x, y, CELL, CELL);
           ctx.globalAlpha = 1;
           ctx.fillRect(x, y, CELL, 3);
@@ -405,43 +435,39 @@ export class Editor {
 
     // Map boundary outline
     ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 / this.zoom;
     ctx.strokeRect(0, 0, mapW, mapH);
 
     // Hover highlight
     if (!this.testing && this.mouseX >= 0 && this.mouseY >= 0) {
-      const hCol = Math.floor((this.mouseX + this.camX) / CELL);
-      const hRow = Math.floor((this.mouseY + this.camY) / CELL);
+      const hCol = Math.floor((this.mouseX / this.zoom + this.camX) / CELL);
+      const hRow = Math.floor((this.mouseY / this.zoom + this.camY) / CELL);
       if (hCol >= 0 && hCol < this.cols && hRow >= 0 && hRow < this.rows) {
-        const hx0 = hCol * CELL;
-        const hy0 = hRow * CELL;
-
+        const x = hCol * CELL;
+        const y = hRow * CELL;
         ctx.fillStyle = 'rgba(255,255,255,0.2)';
         ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2 / this.zoom;
 
         if (this.tool === 2) {
-          // Trampoline — thin strip preview
           let hx, hy, hw, hh;
-          if (this.rotation === 0) { hx=hx0; hy=hy0+CELL-12; hw=CELL; hh=12; }
-          else if (this.rotation === 1) { hx=hx0+CELL-12; hy=hy0; hw=12; hh=CELL; }
-          else if (this.rotation === 2) { hx=hx0; hy=hy0; hw=CELL; hh=12; }
-          else { hx=hx0; hy=hy0; hw=12; hh=CELL; }
+          if (this.rotation === 0) { hx=x; hy=y+CELL-12; hw=CELL; hh=12; }
+          else if (this.rotation === 1) { hx=x+CELL-12; hy=y; hw=12; hh=CELL; }
+          else if (this.rotation === 2) { hx=x; hy=y; hw=CELL; hh=12; }
+          else { hx=x; hy=y; hw=12; hh=CELL; }
           ctx.fillRect(hx, hy, hw, hh);
           ctx.strokeRect(hx, hy, hw, hh);
         } else if (this.tool === 7) {
-          // Conveyor — thin strip preview
           let hx, hy, hw, hh;
-          if (this.rotation === 0) { hx=hx0; hy=hy0+CELL-8; hw=CELL; hh=8; }
-          else if (this.rotation === 1) { hx=hx0+CELL-8; hy=hy0; hw=8; hh=CELL; }
-          else if (this.rotation === 2) { hx=hx0; hy=hy0; hw=CELL; hh=8; }
-          else { hx=hx0; hy=hy0; hw=8; hh=CELL; }
+          if (this.rotation === 0) { hx=x; hy=y+CELL-8; hw=CELL; hh=8; }
+          else if (this.rotation === 1) { hx=x+CELL-8; hy=y; hw=8; hh=CELL; }
+          else if (this.rotation === 2) { hx=x; hy=y; hw=CELL; hh=8; }
+          else { hx=x; hy=y; hw=8; hh=CELL; }
           ctx.fillRect(hx, hy, hw, hh);
           ctx.strokeRect(hx, hy, hw, hh);
         } else {
-          // Normal full-cell highlight
-          ctx.fillRect(hx0, hy0, CELL, CELL);
-          ctx.strokeRect(hx0, hy0, CELL, CELL);
+          ctx.fillRect(x, y, CELL, CELL);
+          ctx.strokeRect(x, y, CELL, CELL);
         }
       }
     }
@@ -456,42 +482,40 @@ export class Editor {
     ctx.textAlign = 'left';
     ctx.fillText('LEVEL EDITOR', 20, 23);
     ctx.textAlign = 'center';
-    ctx.fillText(`${this.cols}x${this.rows}`, CANVAS_WIDTH / 2, 23);
+    ctx.fillText(`${this.cols}x${this.rows}  ${Math.round(this.zoom * 100)}%`, CANVAS_WIDTH / 2, 23);
     ctx.textAlign = 'right';
     const block = BLOCK_TYPES[this.tool];
     ctx.fillText(`Tool: ${block.name}`, CANVAS_WIDTH - 20, 23);
     ctx.textAlign = 'left';
 
-    // Direction toggle for rotatable tools — shown below the HUD bar
+    // Direction toggle
     if (ROTATABLE.has(this.tool)) {
       const isConveyor = this.tool === 7;
-      const isVert = this.rotation === 1 || this.rotation === 3;
-      const label = isConveyor
-        ? (isVert ? (this.rotation === 3 ? '\u2191 Up' : '\u2193 Down') : (this.rotation === 0 ? '\u2192 Right' : '\u2190 Left'))
-        : (isVert ? (this.rotation === 1 ? '\u2190 Left' : '\u2192 Right') : (this.rotation === 0 ? '\u2191 Up' : '\u2193 Down'));
-
+      const isJT = this.tool === 5;
+      let label;
+      if (isConveyor) {
+        label = ['\u2192 Right', '\u2193 Down', '\u2190 Left', '\u2191 Up'][this.rotation];
+      } else if (isJT) {
+        label = ['Pass \u2191', 'Pass \u2190', 'Pass \u2193', 'Pass \u2192'][this.rotation];
+      } else {
+        label = ['Bounce \u2191', 'Bounce \u2190', 'Bounce \u2193', 'Bounce \u2192'][this.rotation];
+      }
       const bw = 120, bh = 22;
       const bx = CANVAS_WIDTH / 2 - bw / 2;
       const by = 36;
-      // Background
       ctx.fillStyle = 'rgba(20,20,40,0.8)';
       ctx.fillRect(bx, by, bw, bh);
-      // Left arrow
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('\u25C0', bx + 14, by + 16);
-      // Direction label
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 11px sans-serif';
       ctx.fillText(label, CANVAS_WIDTH / 2, by + 16);
-      // Right arrow
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
       ctx.font = 'bold 14px sans-serif';
       ctx.fillText('\u25B6', bx + bw - 14, by + 16);
       ctx.textAlign = 'left';
-
-      // Store toggle hit area for click detection
       this._dirToggleRect = { x: bx, y: by, w: bw, h: bh };
     } else {
       this._dirToggleRect = null;
@@ -499,7 +523,6 @@ export class Editor {
   }
 
   toMap() {
-    // Find bounding box of all placed blocks
     let minCol = this.cols, minRow = this.rows, maxCol = 0, maxRow = 0;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
@@ -512,16 +535,25 @@ export class Editor {
       }
     }
 
-    // No blocks placed — make a tiny default map
     if (maxCol === 0) {
       minCol = 0; minRow = 0; maxCol = 5; maxRow = 5;
     }
 
-    // Pad: 1 col each side for walls, 20 rows above for sky + ceiling, 1 row below for floor
     const startCol = Math.max(0, minCol - 1);
-    const startRow = minRow - 21; // can go negative — that's fine, we offset everything
+    const startRow = minRow - 21;
     const endCol = Math.min(this.cols, maxCol + 1);
-    const endRow = maxRow + 1; // +1 for auto floor
+
+    // Find lowest solid row (not counting trampolines/conveyors which are thin)
+    let lowestSolidRow = maxRow;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const t = this.grid[r][c] & 0xF;
+        if (SOLID_GRID_TYPES.has(t) || t === 5 || t === 6) {
+          if (r + 1 > lowestSolidRow) lowestSolidRow = r + 1;
+        }
+      }
+    }
+    const endRow = lowestSolidRow + 1;
 
     const mapW = (endCol - startCol) * CELL;
     const mapH = (endRow - startRow) * CELL;
@@ -529,18 +561,15 @@ export class Editor {
     const offY = startRow * CELL;
     const platforms = [];
 
-    // Visible ceiling at top (row 0 of the map = 20 rows above topmost block)
+    // Ceiling
     platforms.push({ x: 0, y: 0, w: mapW, h: CELL });
-
-    // Visible side walls (full height from ceiling to floor)
+    // Walls
     platforms.push({ x: 0, y: 0, w: 20, h: mapH });
     platforms.push({ x: mapW - 20, y: 0, w: 20, h: mapH });
-
-    // Visible floor at bottom
+    // Floor
     platforms.push({ x: 0, y: mapH - CELL, w: mapW, h: CELL });
 
-    // Merge adjacent same-type horizontal cells into platforms
-    // Trampolines and conveyors are NOT merged — each cell is its own platform
+    // Build platforms from grid
     for (let r = startRow; r < maxRow; r++) {
       let c = startCol;
       while (c < endCol) {
@@ -550,7 +579,7 @@ export class Editor {
         if (type === 0) { c++; continue; }
 
         if (type === 2) {
-          // Trampoline — each cell is its own platform
+          // Trampoline — thin strip, individual
           let tx, ty, tw, th;
           const bx = c * CELL - offX;
           const by = r * CELL - offY;
@@ -558,64 +587,47 @@ export class Editor {
           else if (rot === 1) { tx = bx + CELL - 12; ty = by; tw = 12; th = CELL; }
           else if (rot === 2) { tx = bx; ty = by; tw = CELL; th = 12; }
           else { tx = bx; ty = by; tw = 12; th = CELL; }
-
-          // bounceDir: 0=up, 1=left, 2=down, 3=right
-          const bounceDir = rot; // rot 0->up(0), 1->left(1), 2->down(2), 3->right(3)
-          platforms.push({
-            x: tx, y: ty, w: tw, h: th,
-            type: 'trampoline',
-            bounceDir,
-          });
+          platforms.push({ x: tx, y: ty, w: tw, h: th, type: 'trampoline', bounceDir: rot });
           c++;
           continue;
         }
 
         if (type === 7) {
-          // Conveyor — thin strip, each cell is its own platform
+          // Conveyor — thin strip, individual
+          let tx, ty, tw, th;
           const bx = c * CELL - offX;
           const by = r * CELL - offY;
-          let tx, ty, tw, th;
           if (rot === 0) { tx = bx; ty = by + CELL - 8; tw = CELL; th = 8; }
           else if (rot === 1) { tx = bx + CELL - 8; ty = by; tw = 8; th = CELL; }
           else if (rot === 2) { tx = bx; ty = by; tw = CELL; th = 8; }
           else { tx = bx; ty = by; tw = 8; th = CELL; }
-
-          platforms.push({
-            x: tx, y: ty, w: tw, h: th,
-            type: 'conveyor',
-            pushDir: rot, // 0=right, 1=down, 2=left, 3=up
-          });
+          platforms.push({ x: tx, y: ty, w: tw, h: th, type: 'conveyor', pushDir: rot });
           c++;
           continue;
         }
 
         if (type === 5) {
-          // Jump-through — full 32x32 block, each cell separate (rotation matters)
+          // Jump-through with rotation
           platforms.push({
-            x: c * CELL - offX,
-            y: r * CELL - offY,
+            x: c * CELL - offX, y: r * CELL - offY,
             w: CELL, h: CELL,
-            type: 'jumpthrough',
-            passDir: rot, // 0=from below, 1=from left, 2=from above, 3=from right
+            type: 'jumpthrough', passDir: rot,
           });
           c++;
           continue;
         }
 
         if (type === 6) {
-          // One-Way (legacy) — treat as jumpthrough with passDir 0
           platforms.push({
-            x: c * CELL - offX,
-            y: r * CELL - offY,
+            x: c * CELL - offX, y: r * CELL - offY,
             w: CELL, h: CELL,
-            type: 'jumpthrough',
-            passDir: 0,
+            type: 'jumpthrough', passDir: 0,
           });
           c++;
           continue;
         }
 
-        // Normal merging for other types
+        // Merge adjacent same-type cells horizontally
         const sc = c;
         while (c < endCol && ((this.grid[r]?.[c] || 0) & 0xF) === type) c++;
         const plat = {
@@ -630,13 +642,14 @@ export class Editor {
       }
     }
 
-    // Fill dead space below blocks down to the floor
+    // Fill dead space — only below solid block types (not trampolines/conveyors)
     const floorRow = endRow - 1;
     const fillGrid = [];
     for (let c = startCol; c < endCol; c++) {
       let lowestBlock = -1;
       for (let r = maxRow - 1; r >= Math.max(0, minRow); r--) {
-        if ((this.grid[r]?.[c] || 0) !== 0) {
+        const t = (this.grid[r]?.[c] || 0) & 0xF;
+        if (SOLID_GRID_TYPES.has(t) || t === 5 || t === 6) {
           lowestBlock = r;
           break;
         }
@@ -652,10 +665,11 @@ export class Editor {
     for (let c = startCol; c < endCol; c++) {
       let hasBlock = false;
       for (let r = Math.max(0, minRow); r < maxRow; r++) {
-        if ((this.grid[r]?.[c] || 0) !== 0) { hasBlock = true; break; }
+        const t = (this.grid[r]?.[c] || 0) & 0xF;
+        if (t !== 0 && t !== 2 && t !== 7) { hasBlock = true; break; }
       }
       if (!hasBlock) {
-        for (let r = floorRow - 1; r >= 0; r--) {
+        for (let r = 0; r < floorRow; r++) {
           if (fillGrid[r]?.[c]) delete fillGrid[r][c];
         }
       }
@@ -691,14 +705,12 @@ export class Editor {
   }
 
   _findSpawns(count, startCol, startRow, endCol, endRow, offX, offY, mapW, mapH) {
-    const SOLID_TYPES = new Set([1, 3, 4, 7]);
     const spots = [];
-
     for (let c = startCol; c < endCol; c++) {
       for (let r = startRow + 1; r < endRow; r++) {
         const below = (this.grid[r]?.[c] || 0) & 0xF;
         const here = (this.grid[r - 1]?.[c] || 0) & 0xF;
-        if (SOLID_TYPES.has(below) && here === 0) {
+        if (SOLID_GRID_TYPES.has(below) && here === 0) {
           const above = r >= 2 ? ((this.grid[r - 2]?.[c] || 0) & 0xF) : 0;
           if (above === 0) {
             const sx = c * CELL - offX + (CELL - PLAYER_WIDTH) / 2;
@@ -729,107 +741,11 @@ export class Editor {
     return result;
   }
 
-  save() {
-    // New binary format: version byte 255, cols, rows, then RLE pairs [value, count]
-    const bytes = [255, this.cols, this.rows];
-    for (let r = 0; r < this.rows; r++) {
-      let c = 0;
-      while (c < this.cols) {
-        const val = this.grid[r][c];
-        let count = 1;
-        while (c + count < this.cols && this.grid[r][c + count] === val && count < 255) count++;
-        bytes.push(val, count);
-        c += count;
-      }
-    }
-    // Convert to base64
-    const arr = new Uint8Array(bytes);
-    let binary = '';
-    for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-    return btoa(binary);
-  }
-
-  load(code) {
-    try {
-      const raw = atob(code.trim());
-      // Detect format: new binary starts with byte 255
-      if (raw.charCodeAt(0) === 255) {
-        return this._loadBinary(raw);
-      }
-      return this._loadLegacy(raw);
-    } catch (e) {
-      console.error('Failed to load level code:', e);
-      return false;
-    }
-  }
-
-  _loadBinary(raw) {
-    const cols = raw.charCodeAt(1);
-    const rows = raw.charCodeAt(2);
-    this.cols = Math.max(MIN_COLS, Math.min(MAX_COLS, cols));
-    this.rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, rows));
-    this.grid = this.makeGrid();
-
-    let r = 0, c = 0;
-    let i = 3;
-    while (i + 1 < raw.length && r < this.rows) {
-      const val = raw.charCodeAt(i);
-      const count = raw.charCodeAt(i + 1);
-      i += 2;
-      for (let j = 0; j < count && r < this.rows; j++) {
-        if (c < this.cols) {
-          this.grid[r][c] = val;
-        }
-        c++;
-        if (c >= cols) { c = 0; r++; }
-      }
-    }
-    this._clampCamera();
-    return true;
-  }
-
-  _loadLegacy(raw) {
-    const [header, body] = raw.split(';');
-    const [colsStr, rowsStr] = header.split('x');
-    this.cols = Math.max(MIN_COLS, Math.min(MAX_COLS, parseInt(colsStr)));
-    this.rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, parseInt(rowsStr)));
-    this.grid = this.makeGrid();
-
-    if (!body) return true;
-    const rowStrs = body.split('|');
-    for (let r = 0; r < rowStrs.length && r < this.rows; r++) {
-      const rle = rowStrs[r];
-      let c = 0;
-      let i = 0;
-      while (i < rle.length && c < this.cols) {
-        let numStr = '';
-        while (i < rle.length && rle[i] >= '1' && rle[i] <= '9' && (numStr + rle[i]).length < 4) {
-          numStr += rle[i];
-          i++;
-        }
-        if (i < rle.length) {
-          const val = parseInt(rle[i]);
-          i++;
-          if (val >= 0 && val <= 7) {
-            const count = numStr ? parseInt(numStr) : 1;
-            for (let j = 0; j < count && c < this.cols; j++) {
-              this.grid[r][c] = val;
-              c++;
-            }
-          }
-        }
-      }
-    }
-    this._clampCamera();
-    return true;
-  }
-
   generateBoundaries() {
-    // Find bounding box
     let minCol = this.cols, minRow = this.rows, maxCol = 0, maxRow = 0;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
-        if (this.grid[r][c] !== 0) {
+        if ((this.grid[r][c] & 0xF) !== 0) {
           if (c < minCol) minCol = c;
           if (c + 1 > maxCol) maxCol = c + 1;
           if (r < minRow) minRow = r;
@@ -837,22 +753,138 @@ export class Editor {
         }
       }
     }
-    if (maxCol === 0) return; // nothing placed
+    if (maxCol === 0) return;
 
-    // Add floor row below
-    const floorRow = Math.min(maxRow, this.rows - 1);
-    for (let c = Math.max(0, minCol - 1); c < Math.min(this.cols, maxCol + 1); c++) {
-      if (this.grid[floorRow][c] === 0) this.grid[floorRow][c] = 1;
+    const left = Math.max(0, minCol - 1);
+    const right = Math.min(this.cols - 1, maxCol);
+    const top = Math.max(0, minRow - 1);
+
+    // Find lowest solid block row (not thin trampolines/conveyors)
+    let bottom = maxRow;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const t = this.grid[r][c] & 0xF;
+        if (SOLID_GRID_TYPES.has(t) || t === 5 || t === 6) {
+          if (r + 1 > bottom) bottom = r + 1;
+        }
+      }
     }
-    // Add left wall
-    const wallCol = Math.max(0, minCol - 1);
-    for (let r = Math.max(0, minRow - 1); r <= floorRow; r++) {
-      if (this.grid[r][wallCol] === 0) this.grid[r][wallCol] = 1;
+
+    // Only add floor if there isn't already a full row of blocks at the bottom
+    const floorRow = Math.min(bottom, this.rows - 1);
+    let hasFloor = true;
+    for (let c = left; c <= right; c++) {
+      if ((this.grid[floorRow]?.[c] & 0xF) === 0) { hasFloor = false; break; }
     }
-    // Add right wall
-    const wallColR = Math.min(this.cols - 1, maxCol);
-    for (let r = Math.max(0, minRow - 1); r <= floorRow; r++) {
-      if (this.grid[r][wallColR] === 0) this.grid[r][wallColR] = 1;
+    if (!hasFloor) {
+      for (let c = left; c <= right; c++) {
+        if (this.grid[floorRow] && (this.grid[floorRow][c] & 0xF) === 0) {
+          this.grid[floorRow][c] = 1;
+        }
+      }
+    }
+
+    // Left wall
+    for (let r = top; r <= floorRow; r++) {
+      if (this.grid[r] && (this.grid[r][left] & 0xF) === 0) {
+        this.grid[r][left] = 1;
+      }
+    }
+    // Right wall
+    for (let r = top; r <= floorRow; r++) {
+      if (this.grid[r] && (this.grid[r][right] & 0xF) === 0) {
+        this.grid[r][right] = 1;
+      }
+    }
+  }
+
+  save() {
+    // Binary format: version 255, cols, rows, RLE pairs [value, count]
+    const bytes = [];
+    const raw = [];
+    raw.push(255); // version marker
+    raw.push(this.cols);
+    raw.push(this.rows);
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        raw.push(this.grid[r][c]);
+      }
+    }
+    // RLE compress
+    let i = 0;
+    while (i < raw.length) {
+      const val = raw[i];
+      let count = 1;
+      while (i + count < raw.length && raw[i + count] === val && count < 255) count++;
+      bytes.push(val, count);
+      i += count;
+    }
+    return btoa(String.fromCharCode(...bytes));
+  }
+
+  load(code) {
+    try {
+      const binary = atob(code.trim());
+      const data = [];
+      for (let i = 0; i < binary.length; i++) data.push(binary.charCodeAt(i));
+
+      if (data[0] === 255) {
+        // New binary format
+        // Decompress RLE
+        const decompressed = [];
+        let i = 0;
+        while (i < data.length - 1) {
+          const val = data[i];
+          const count = data[i + 1];
+          for (let j = 0; j < count; j++) decompressed.push(val);
+          i += 2;
+        }
+        // First 3 bytes: version, cols, rows
+        this.cols = Math.max(MIN_COLS, Math.min(MAX_COLS, decompressed[1]));
+        this.rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, decompressed[2]));
+        this.grid = this.makeGrid();
+        let idx = 3;
+        for (let r = 0; r < this.rows; r++) {
+          for (let c = 0; c < this.cols; c++) {
+            if (idx < decompressed.length) this.grid[r][c] = decompressed[idx++];
+          }
+        }
+      } else {
+        // Old text format
+        const raw = binary;
+        const [header, body] = raw.split(';');
+        const [colsStr, rowsStr] = header.split('x');
+        this.cols = Math.max(MIN_COLS, Math.min(MAX_COLS, parseInt(colsStr)));
+        this.rows = Math.max(MIN_ROWS, Math.min(MAX_ROWS, parseInt(rowsStr)));
+        this.grid = this.makeGrid();
+        if (body) {
+          const rowStrs = body.split('|');
+          for (let r = 0; r < rowStrs.length && r < this.rows; r++) {
+            const rle = rowStrs[r];
+            let c = 0, i = 0;
+            while (i < rle.length && c < this.cols) {
+              let numStr = '';
+              while (i < rle.length && rle[i] >= '1' && rle[i] <= '9' && numStr.length < 3) {
+                numStr += rle[i]; i++;
+              }
+              if (i < rle.length) {
+                const val = parseInt(rle[i]); i++;
+                if (val >= 0 && val <= 6) {
+                  const count = numStr ? parseInt(numStr) : 1;
+                  for (let j = 0; j < count && c < this.cols; j++) {
+                    this.grid[r][c] = val; c++;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      this._clampCamera();
+      return true;
+    } catch (e) {
+      console.error('Failed to load level code:', e);
+      return false;
     }
   }
 
@@ -866,10 +898,10 @@ export class Editor {
     this.canvas.removeEventListener('mouseup', this._onMouseUp);
     this.canvas.removeEventListener('mouseleave', this._onMouseUp);
     this.canvas.removeEventListener('contextmenu', this._onContextMenu);
+    this.canvas.removeEventListener('wheel', this._onWheel);
     window.removeEventListener('keydown', this._onKeyDown);
     window.removeEventListener('keyup', this._onKeyUp);
   }
 }
 
-// Exported for main.js palette building
 export { PALETTE_TYPES, ROTATABLE };
