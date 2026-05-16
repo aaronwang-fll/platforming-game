@@ -654,7 +654,6 @@ btnEditorTest.addEventListener('click', () => {
   editor.testing = true;
   editorTransition = 1;
   editorTransitionType = 'start';
-  editor.generateBoundaries();
   editorTestMap = editor.toMap();
   // Reset crumble states
   for (const p of editorTestMap.platforms) {

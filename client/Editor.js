@@ -624,6 +624,29 @@ export class Editor {
       }
     }
 
+    // Fill closed spaces — for each column with solid blocks, fill below lowest solid to bottom
+    for (let c = startCol; c < endCol; c++) {
+      let lowestSolid = -1;
+      for (let r = endRow - 1; r >= startRow; r--) {
+        const t = (this.grid[r]?.[c] || 0) & 0xF;
+        if (SOLID_GRID_TYPES.has(t)) { lowestSolid = r; break; }
+      }
+      if (lowestSolid < 0) continue;
+      // Fill from lowestSolid+1 to endRow-1
+      for (let r = lowestSolid + 1; r < endRow; r++) {
+        const t = (this.grid[r]?.[c] || 0) & 0xF;
+        if (t === 0) {
+          // Only fill if this column has solid above (enclosed)
+          platforms.push({
+            x: c * CELL - offX,
+            y: r * CELL - offY,
+            w: CELL,
+            h: CELL,
+          });
+        }
+      }
+    }
+
     const spawns = this._findSpawns(8, startCol, startRow, endCol, endRow, offX, offY, mapW, mapH);
 
     return {
