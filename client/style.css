@@ -44,10 +44,12 @@ body {
   font-weight: 600;
 }
 
-.build-id {
-  color: rgba(255,255,255,0.3);
-  font-size: 0.7em;
-  margin-bottom: 1em;
+.deploy-code {
+  color: rgba(255,255,255,0.35);
+  font-size: 0.75em;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  margin-bottom: 0.3em;
 }
 
 #lobby input, #lobby select, #lobby button {
