@@ -30,6 +30,8 @@ export class Renderer {
     else h = w / ratio;
     this.canvas.style.width = w + 'px';
     this.canvas.style.height = h + 'px';
+    this.canvas.style.left = ((window.innerWidth - w) / 2) + 'px';
+    this.canvas.style.top = ((window.innerHeight - h) / 2) + 'px';
   }
 
   clear(bg) {
