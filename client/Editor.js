@@ -539,35 +539,17 @@ export class Editor {
       minCol = 0; minRow = 0; maxCol = 5; maxRow = 5;
     }
 
-    const startCol = Math.max(0, minCol - 1);
-    const startRow = minRow - 21;
-    const endCol = Math.min(this.cols, maxCol + 1);
-
-    // Find lowest solid row (not counting trampolines/conveyors which are thin)
-    let lowestSolidRow = maxRow;
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        const t = this.grid[r][c] & 0xF;
-        if (SOLID_GRID_TYPES.has(t) || t === 5 || t === 6) {
-          if (r + 1 > lowestSolidRow) lowestSolidRow = r + 1;
-        }
-      }
-    }
-    const endRow = lowestSolidRow + 1;
+    // Map bounds = exact content bounding box (no extra padding)
+    const startCol = minCol;
+    const startRow = minRow;
+    const endCol = maxCol;
+    const endRow = maxRow;
 
     const mapW = (endCol - startCol) * CELL;
     const mapH = (endRow - startRow) * CELL;
     const offX = startCol * CELL;
     const offY = startRow * CELL;
     const platforms = [];
-
-    // Ceiling
-    platforms.push({ x: 0, y: 0, w: mapW, h: CELL });
-    // Walls
-    platforms.push({ x: 0, y: 0, w: 20, h: mapH });
-    platforms.push({ x: mapW - 20, y: 0, w: 20, h: mapH });
-    // Floor
-    platforms.push({ x: 0, y: mapH - CELL, w: mapW, h: CELL });
 
     // Build platforms from grid
     for (let r = startRow; r < maxRow; r++) {
@@ -642,55 +624,6 @@ export class Editor {
       }
     }
 
-    // Fill dead space — only below solid block types (not trampolines/conveyors)
-    const floorRow = endRow - 1;
-    const fillGrid = [];
-    for (let c = startCol; c < endCol; c++) {
-      let lowestBlock = -1;
-      for (let r = maxRow - 1; r >= Math.max(0, minRow); r--) {
-        const t = (this.grid[r]?.[c] || 0) & 0xF;
-        if (SOLID_GRID_TYPES.has(t) || t === 5 || t === 6) {
-          lowestBlock = r;
-          break;
-        }
-      }
-      if (lowestBlock >= 0) {
-        for (let r = lowestBlock + 1; r < floorRow; r++) {
-          if (!fillGrid[r]) fillGrid[r] = {};
-          fillGrid[r][c] = true;
-        }
-      }
-    }
-
-    for (let c = startCol; c < endCol; c++) {
-      let hasBlock = false;
-      for (let r = Math.max(0, minRow); r < maxRow; r++) {
-        const t = (this.grid[r]?.[c] || 0) & 0xF;
-        if (t !== 0 && t !== 2 && t !== 7) { hasBlock = true; break; }
-      }
-      if (!hasBlock) {
-        for (let r = 0; r < floorRow; r++) {
-          if (fillGrid[r]?.[c]) delete fillGrid[r][c];
-        }
-      }
-    }
-
-    for (let r = 0; r < floorRow; r++) {
-      if (!fillGrid[r]) continue;
-      let c = startCol;
-      while (c < endCol) {
-        if (!fillGrid[r][c]) { c++; continue; }
-        const sc = c;
-        while (c < endCol && fillGrid[r][c]) c++;
-        platforms.push({
-          x: sc * CELL - offX,
-          y: r * CELL - offY,
-          w: (c - sc) * CELL,
-          h: CELL,
-        });
-      }
-    }
-
     const spawns = this._findSpawns(8, startCol, startRow, endCol, endRow, offX, offY, mapW, mapH);
 
     return {
@@ -755,43 +688,27 @@ export class Editor {
     }
     if (maxCol === 0) return;
 
-    const left = Math.max(0, minCol - 1);
-    const right = Math.min(this.cols - 1, maxCol);
-    const top = Math.max(0, minRow - 1);
+    // Place walls and floor flush with the content (no gap)
+    const left = minCol;       // leftmost content column — wall goes here
+    const right = maxCol - 1;  // rightmost content column — wall goes here
+    const floorRow = Math.min(maxRow, this.rows - 1); // one row below lowest content
 
-    // Find lowest solid block row (not thin trampolines/conveyors)
-    let bottom = maxRow;
-    for (let r = 0; r < this.rows; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        const t = this.grid[r][c] & 0xF;
-        if (SOLID_GRID_TYPES.has(t) || t === 5 || t === 6) {
-          if (r + 1 > bottom) bottom = r + 1;
-        }
-      }
-    }
-
-    // Only add floor if there isn't already a full row of blocks at the bottom
-    const floorRow = Math.min(bottom, this.rows - 1);
-    let hasFloor = true;
+    // Floor — fill the row below the lowest content
     for (let c = left; c <= right; c++) {
-      if ((this.grid[floorRow]?.[c] & 0xF) === 0) { hasFloor = false; break; }
-    }
-    if (!hasFloor) {
-      for (let c = left; c <= right; c++) {
-        if (this.grid[floorRow] && (this.grid[floorRow][c] & 0xF) === 0) {
-          this.grid[floorRow][c] = 1;
-        }
+      if (this.grid[floorRow] && (this.grid[floorRow][c] & 0xF) === 0) {
+        this.grid[floorRow][c] = 1;
       }
     }
 
-    // Left wall
-    for (let r = top; r <= floorRow; r++) {
+    // Left wall — fill leftmost column from top content to floor
+    for (let r = minRow; r <= floorRow; r++) {
       if (this.grid[r] && (this.grid[r][left] & 0xF) === 0) {
         this.grid[r][left] = 1;
       }
     }
-    // Right wall
-    for (let r = top; r <= floorRow; r++) {
+
+    // Right wall — fill rightmost column from top content to floor
+    for (let r = minRow; r <= floorRow; r++) {
       if (this.grid[r] && (this.grid[r][right] & 0xF) === 0) {
         this.grid[r][right] = 1;
       }

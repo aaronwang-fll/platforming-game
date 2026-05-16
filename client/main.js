@@ -426,23 +426,15 @@ function enterEditor(loadIndex) {
 
 // Show library landing page when editor button clicked
 document.getElementById('btn-editor').addEventListener('click', () => {
-  // Create a temporary editor just to access library
-  const tempEditor = new Editor(canvas);
-  showLibraryLanding(tempEditor);
-  tempEditor.destroy();
-});
-
-function showLibraryLanding(tempEditor) {
-  const lib = tempEditor.library;
+  // Load library from localStorage directly (no need for temp Editor)
+  let lib = [];
+  try {
+    const saved = localStorage.getItem('tag_editor_library');
+    if (saved) lib = JSON.parse(saved);
+  } catch (e) { /* ignore */ }
   libraryPanel.style.display = 'block';
-  showScreen('game');
-  // Draw a dark background on canvas
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#1a1a2e';
-  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
   renderLibraryLanding(lib);
-}
+});
 
 function renderLibraryLanding(lib) {
   libraryList.innerHTML = '';
