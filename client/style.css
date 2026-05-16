@@ -821,3 +821,12 @@ body {
 .library-item button:hover { background: rgba(255,255,255,0.25); }
 .library-item .lib-delete { color: rgba(255,120,120,0.8); }
 .library-item .lib-delete:hover { background: rgba(255,80,80,0.3); }
+
+.library-new {
+  background: rgba(67,233,123,0.12) !important;
+  border: 1px dashed rgba(67,233,123,0.3);
+  justify-content: center;
+  font-weight: 700;
+  color: rgba(67,233,123,0.8) !important;
+}
+.library-new:hover { background: rgba(67,233,123,0.2) !important; }

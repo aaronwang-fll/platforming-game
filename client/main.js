@@ -406,9 +406,12 @@ const editorRowsInput = document.getElementById('editor-rows');
 
 const btnEditorToolbarPos = document.getElementById('btn-editor-toolbar-pos');
 
-document.getElementById('btn-editor').addEventListener('click', () => {
+function enterEditor(loadIndex) {
   editorMode = true;
   editor = new Editor(canvas);
+  if (loadIndex !== undefined && loadIndex >= 0) {
+    editor.libraryLoad(loadIndex);
+  }
   showScreen('game');
   editorUI.style.display = 'block';
   btnQuit.style.display = 'none';
@@ -419,7 +422,111 @@ document.getElementById('btn-editor').addEventListener('click', () => {
   editorColsInput.value = editor.cols;
   editorRowsInput.value = editor.rows;
   requestAnimationFrame(editorLoop);
+}
+
+// Show library landing page when editor button clicked
+document.getElementById('btn-editor').addEventListener('click', () => {
+  // Create a temporary editor just to access library
+  const tempEditor = new Editor(canvas);
+  showLibraryLanding(tempEditor);
+  tempEditor.destroy();
 });
+
+function showLibraryLanding(tempEditor) {
+  const lib = tempEditor.library;
+  libraryPanel.style.display = 'block';
+  showScreen('game');
+  // Draw a dark background on canvas
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+  renderLibraryLanding(lib);
+}
+
+function renderLibraryLanding(lib) {
+  libraryList.innerHTML = '';
+
+  // "New Design" button at top
+  const newDiv = document.createElement('div');
+  newDiv.className = 'library-item library-new';
+  newDiv.innerHTML = '<span>+ New Blank Design</span>';
+  newDiv.style.cursor = 'pointer';
+  newDiv.addEventListener('click', () => {
+    libraryPanel.style.display = 'none';
+    enterEditor();
+  });
+  libraryList.appendChild(newDiv);
+
+  if (lib.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:rgba(255,255,255,0.4);font-size:0.8em;padding:8px;text-align:center;';
+    empty.textContent = 'No saved designs yet';
+    libraryList.appendChild(empty);
+    return;
+  }
+
+  for (let i = 0; i < lib.length; i++) {
+    const entry = lib[i];
+    const div = document.createElement('div');
+    div.className = 'library-item';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = entry.name;
+    div.appendChild(nameSpan);
+
+    const makeBtn = (text, cls, fn) => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      if (cls) b.className = cls;
+      b.addEventListener('click', fn);
+      div.appendChild(b);
+    };
+
+    makeBtn('Edit', '', () => {
+      libraryPanel.style.display = 'none';
+      enterEditor(i);
+    });
+
+    makeBtn('Code', '', () => {
+      const code = entry.code;
+      navigator.clipboard.writeText(code).catch(() => {});
+      alert('Code copied to clipboard!');
+    });
+
+    makeBtn('Rename', '', () => {
+      const newName = prompt('Rename design:', entry.name);
+      if (newName === null || newName.trim() === '') return;
+      // Update library directly
+      const savedLib = JSON.parse(localStorage.getItem('tag_editor_library') || '[]');
+      if (savedLib[i]) {
+        savedLib[i].name = newName.trim();
+        localStorage.setItem('tag_editor_library', JSON.stringify(savedLib));
+        entry.name = newName.trim();
+      }
+      renderLibraryLanding(lib);
+    });
+
+    makeBtn('Duplicate', '', () => {
+      const savedLib = JSON.parse(localStorage.getItem('tag_editor_library') || '[]');
+      savedLib.push({ ...entry, name: entry.name + ' (copy)', date: Date.now() });
+      localStorage.setItem('tag_editor_library', JSON.stringify(savedLib));
+      lib.push({ ...entry, name: entry.name + ' (copy)', date: Date.now() });
+      renderLibraryLanding(lib);
+    });
+
+    makeBtn('Delete', 'lib-delete', () => {
+      if (!confirm(`Delete "${entry.name}"?`)) return;
+      const savedLib = JSON.parse(localStorage.getItem('tag_editor_library') || '[]');
+      savedLib.splice(i, 1);
+      localStorage.setItem('tag_editor_library', JSON.stringify(savedLib));
+      lib.splice(i, 1);
+      renderLibraryLanding(lib);
+    });
+
+    libraryList.appendChild(div);
+  }
+}
 
 btnEditorToolbarPos.addEventListener('click', () => {
   if (!editor) return;
@@ -662,8 +769,9 @@ const libraryPanel = document.getElementById('editor-library-panel');
 const libraryList = document.getElementById('editor-library-list');
 
 document.getElementById('btn-editor-library').addEventListener('click', () => {
+  if (!editor) return;
   libraryPanel.style.display = libraryPanel.style.display === 'none' ? 'block' : 'none';
-  renderLibrary();
+  if (libraryPanel.style.display === 'block') renderLibraryLanding(editor.library);
 });
 
 document.getElementById('btn-library-save').addEventListener('click', () => {
@@ -671,45 +779,13 @@ document.getElementById('btn-library-save').addEventListener('click', () => {
   const name = prompt('Name this design:', `Design ${editor.library.length + 1}`);
   if (name === null) return;
   editor.librarySave(name);
-  renderLibrary();
+  renderLibraryLanding(editor.library);
 });
 
 document.getElementById('btn-library-close').addEventListener('click', () => {
   libraryPanel.style.display = 'none';
+  if (!editorMode) showScreen('lobby');
 });
-
-function renderLibrary() {
-  if (!editor) return;
-  libraryList.innerHTML = '';
-  const items = editor.libraryList();
-  if (items.length === 0) {
-    libraryList.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:0.8em;padding:8px;">No saved designs yet</div>';
-    return;
-  }
-  for (const item of items) {
-    const div = document.createElement('div');
-    div.className = 'library-item';
-    div.innerHTML = `<span>${item.name}</span>`;
-    const loadBtn = document.createElement('button');
-    loadBtn.textContent = 'Load';
-    loadBtn.addEventListener('click', () => {
-      editor.libraryLoad(item.index);
-      editorColsInput.value = editor.cols;
-      editorRowsInput.value = editor.rows;
-      libraryPanel.style.display = 'none';
-    });
-    const delBtn = document.createElement('button');
-    delBtn.className = 'lib-delete';
-    delBtn.textContent = 'X';
-    delBtn.addEventListener('click', () => {
-      editor.libraryDelete(item.index);
-      renderLibrary();
-    });
-    div.appendChild(loadBtn);
-    div.appendChild(delBtn);
-    libraryList.appendChild(div);
-  }
-}
 
 btnEditorExit.addEventListener('click', () => {
   if (!editor) return;
