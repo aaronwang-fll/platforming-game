@@ -688,26 +688,26 @@ export class Editor {
     }
     if (maxCol === 0) return;
 
-    // Place walls and floor flush with the content (no gap)
-    const left = minCol;       // leftmost content column — wall goes here
-    const right = maxCol - 1;  // rightmost content column — wall goes here
-    const floorRow = Math.min(maxRow, this.rows - 1); // one row below lowest content
+    // Place walls and floor OUTSIDE the content (one cell beyond each edge)
+    const left = Math.max(0, minCol - 1);
+    const right = Math.min(this.cols - 1, maxCol);
+    const floorRow = Math.min(maxRow, this.rows - 1);
 
-    // Floor — fill the row below the lowest content
+    // Floor — one row below lowest content, spanning wall to wall
     for (let c = left; c <= right; c++) {
       if (this.grid[floorRow] && (this.grid[floorRow][c] & 0xF) === 0) {
         this.grid[floorRow][c] = 1;
       }
     }
 
-    // Left wall — fill leftmost column from top content to floor
+    // Left wall — one column left of content, from top to floor
     for (let r = minRow; r <= floorRow; r++) {
       if (this.grid[r] && (this.grid[r][left] & 0xF) === 0) {
         this.grid[r][left] = 1;
       }
     }
 
-    // Right wall — fill rightmost column from top content to floor
+    // Right wall — one column right of content, from top to floor
     for (let r = minRow; r <= floorRow; r++) {
       if (this.grid[r] && (this.grid[r][right] & 0xF) === 0) {
         this.grid[r][right] = 1;
